@@ -1,0 +1,18 @@
+# netlify.toml
+# Netlify 部署設定：將 /api/* 路由到 Netlify Functions
+
+[build]
+  publish = "."          # 前端靜態檔放在根目錄
+  functions = "netlify/functions"
+
+# 將 /api/proxy 對應到 proxy Function
+[[redirects]]
+  from   = "/api/proxy"
+  to     = "/.netlify/functions/proxy"
+  status = 200
+
+# SPA fallback（若有多頁可開啟）
+# [[redirects]]
+#   from   = "/*"
+#   to     = "/index.html"
+#   status = 200
