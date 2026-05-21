@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行情分析</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap');
+  :root { --bg:#0f1117;--panel:#181c27;--panel2:#1e2334;--border:#2a3050;--accent:#e8c84a;--accent2:#4a8fe8;--accent3:#4ae8a0;--text:#e8eaf0;--muted:#6b7299;--danger:#e84a4a;--radius:12px; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Serif TC',serif;min-height:100vh;}
+  .header{background:linear-gradient(135deg,#0f1117,#1a1f35);border-bottom:1px solid var(--border);padding:20px 24px;display:flex;align-items:center;gap:16px;}
+  .header-icon{width:44px;height:44px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .header h1{font-size:1.25rem;font-weight:700;}
+  .header p{font-size:0.72rem;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace;}
+  .upload-zone{margin:24px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--panel);padding:40px 24px;text-align:center;cursor:pointer;transition:all 0.2s;}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(232,200,74,0.05);}
+  .upload-zone .icon{font-size:3rem;margin-bottom:12px;}
+  .upload-zone h2{font-size:1.1rem;margin-bottom:8px;}
+  .upload-zone p{font-size:0.8rem;color:var(--muted);margin-bottom:20px;}
+  .mode-selector{display:flex;gap:0;justify-content:center;margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden;width:fit-content;margin-left:auto;margin-right:auto;}
+  .mode-btn{padding:9px 18px;background:transparent;border:none;color:var(--muted);font-family:'Noto Serif TC',serif;font-size:0.82rem;cursor:pointer;transition:all 0.2s;border-right:1px solid var(--border);}
+  .mode-btn:last-child{border-right:none;}
+  .mode-btn.active{background:var(--accent);color:#0f1117;font-weight:700;}
+  .mode-btn:hover:not(.active){color:var(--accent);background:rgba(232,200,74,0.08);}
+  .hint-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.78rem;color:var(--muted);text-align:left;line-height:1.7;}
+  .hint-box strong{color:var(--accent3);}
+  .hint-box code{font-family:'DM Mono',monospace;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;font-size:0.75rem;color:var(--text);}
+  .btn-upload{background:var(--accent);color:#0f1117;border:none;border-radius:8px;padding:10px 28px;font-family:'Noto Serif TC',serif;font-weight:700;font-size:0.95rem;cursor:pointer;transition:all 0.2s;}
+  .btn-upload:hover{background:#f0d44e;transform:translateY(-1px);}
+  #fileInput{display:none;}
+  .file-bar{background:var(--panel2);border-bottom:1px solid var(--border);padding:10px 24px;font-size:0.8rem;font-family:'DM Mono',monospace;color:var(--muted);display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .file-bar .fname{color:var(--accent3);}
+  .file-bar .mode-label{font-size:0.7rem;background:rgba(232,200,74,0.15);color:var(--accent);border-radius:4px;padding:2px 8px;}
+  .filter-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:16px 24px;display:none;}
+  .filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:0.7rem;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;}
+  .field input,.field select{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:0.88rem;font-family:'Noto Serif TC',serif;outline:none;transition:border-color 0.2s;}
+  .field input:focus,.field select:focus{border-color:var(--accent);}
+  .btn{padding:8px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Serif TC',serif;font-weight:600;font-size:0.88rem;transition:all 0.2s;}
+  .btn-primary{background:var(--accent);color:#0f1117;}
+  .btn-primary:hover{background:#f0d44e;}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .range-section{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 24px;display:none;}
+  .range-header{font-size:0.7rem;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;}
+  .ranges-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .range-tag{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:0.82rem;}
+  .range-tag .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .range-tag .remove{cursor:pointer;color:var(--muted);font-size:1rem;margin-left:4px;}
+  .range-tag .remove:hover{color:var(--danger);}
+  .add-range{display:flex;gap:6px;align-items:center;}
+  .add-range input{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:0.82rem;width:80px;outline:none;font-family:'DM Mono',monospace;}
+  .add-range input:focus{border-color:var(--accent);}
+  .add-range span{color:var(--muted);font-size:0.82rem;}
+  .btn-add{background:transparent;border:1px dashed var(--border);color:var(--accent);border-radius:6px;padding:6px 12px;font-size:0.82rem;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+  .btn-add:hover{border-color:var(--accent);background:rgba(232,200,74,0.08);}
+  .status-bar{padding:10px 24px;font-size:0.8rem;font-family:'DM Mono',monospace;color:var(--muted);min-height:36px;display:flex;align-items:center;gap:8px;}
+  .status-bar.success{color:var(--accent3);}
+  .status-bar.error{color:var(--danger);}
+  .stats-grid{display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:16px 24px 0;}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .stat-card .label{font-size:0.68rem;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+  .stat-card .value{font-size:1.3rem;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;}
+  .stat-card .unit{font-size:0.7rem;color:var(--muted);margin-left:2px;}
+  .charts-area{padding:16px 24px;display:flex;flex-direction:column;gap:20px;}
+  .chart-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+  .chart-title{font-size:0.85rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .badge{font-size:0.65rem;font-family:'DM Mono',monospace;background:rgba(232,200,74,0.15);color:var(--accent);border-radius:4px;padding:2px 7px;}
+  .chart-subtitle{font-size:0.72rem;color:var(--muted);margin-bottom:16px;}
+  .chart-wrap{position:relative;height:260px;}
+  .chart-wrap.short{height:220px;}
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+  th{text-align:left;padding:8px 12px;font-family:'DM Mono',monospace;font-size:0.68rem;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:9px 12px;border-bottom:1px solid rgba(42,48,80,0.5);}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .td-num{font-family:'DM Mono',monospace;}
+  .td-accent{color:var(--accent);font-family:'DM Mono',monospace;font-weight:600;}
+  .tab-row{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .tab-btn{padding:7px 16px;background:transparent;border:none;color:var(--muted);font-family:'Noto Serif TC',serif;font-size:0.82rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.2s;}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;color:var(--muted);text-align:center;gap:10px;}
+  .empty-state .icon{font-size:2.5rem;}
+  .source-list{margin:0 24px;display:flex;flex-direction:column;gap:8px;}
+  .source-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .source-item .src-name{font-size:0.82rem;color:var(--accent3);font-family:'DM Mono',monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .source-item .src-count{font-size:0.72rem;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;}
+  .source-item .src-del{cursor:pointer;color:var(--muted);font-size:1.1rem;line-height:1;padding:2px 4px;border-radius:4px;transition:color 0.15s;}
+  .source-item .src-del:hover{color:var(--danger);}
+  .add-source-btn{margin:8px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  /* ── 鄰居詳情彈窗 ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.5);}
+  .modal-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:sticky;top:0;background:var(--panel);border-radius:16px 16px 0 0;}
+  .modal-title{font-size:0.95rem;font-weight:700;line-height:1.4;}
+  .modal-subtitle{font-size:0.72rem;color:var(--muted);margin-top:3px;}
+  .modal-close{background:transparent;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px;flex-shrink:0;}
+  .modal-close:hover{color:var(--text);background:var(--panel2);}
+  .modal-body{padding:16px 20px;}
+  .txn-card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+  .txn-card:last-child{margin-bottom:0;}
+  .txn-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#0f1117;font-size:0.72rem;font-weight:700;margin-right:8px;flex-shrink:0;}
+  .txn-date{font-size:0.8rem;color:var(--muted);font-family:'DM Mono',monospace;}
+  .txn-price{font-size:1.4rem;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;}
+  .txn-unit{font-size:0.82rem;color:var(--muted);margin-left:4px;}
+  .txn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .txn-tag{font-size:0.72rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 9px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .txn-tag.accent{color:var(--accent3);border-color:rgba(74,232,160,0.3);}
+  .txn-note{font-size:0.72rem;color:#e8a032;margin-top:6px;}
+  .neighbor-cell-btn{cursor:pointer;transition:background 0.15s;}
+  .neighbor-cell-btn:hover{background:rgba(232,200,74,0.08)!important;}
+  .calc-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin:0 24px 0;}
+  .calc-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+  .calc-label{font-size:0.72rem;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;}
+  .calc-input{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-size:0.88rem;font-family:'DM Mono',monospace;outline:none;width:90px;}
+  .calc-input:focus{border-color:var(--accent);}
+  .calc-result{font-size:1.1rem;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;}
+  .calc-result span{font-size:0.72rem;color:var(--muted);font-weight:400;margin-left:3px;}
+  @media(max-width:600px){
+    .upload-zone{margin:14px;}
+    .filter-bar,.range-section,.stats-grid,.charts-area{padding-left:14px;padding-right:14px;}
+    .filter-row{flex-direction:column;align-items:stretch;}
+    .btn{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-icon">🏙️</div>
+  <div>
+    <h1>行情分析</h1>
+    <p>上傳實價登錄 Excel → 自動產生趨勢圖表</p>
+  </div>
+</div>
+
+<div class="upload-zone" id="uploadZone">
+  <div class="icon">📂</div>
+  <h2>上傳成交資料</h2>
+
+  <div class="mode-selector">
+    <button class="mode-btn active" onclick="setMode('normal')" id="btn-normal">一般住宅（內政部實價登入匯出）</button>
+    <button class="mode-btn" onclick="setMode('townhouse')" id="btn-townhouse">透天（5168實價登入匯出）</button>
+  </div>
+
+  <div class="hint-box" id="uploadHint">
+    從內政部實價登錄「社區/個案查詢」匯出的 Excel<br>
+    支援 <code>.xlsx</code> / <code>.xls</code> 格式，可上傳多個社區合併分析
+  </div>
+
+  <!-- data/ 資料夾來源清單（GitHub Pages 模式） -->
+  <div id="dataSourcePanel" style="margin-bottom:16px;display:none">
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace">📁 data/ 資料夾</div>
+    <div id="dataSourceList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+    <button class="btn-upload" onclick="loadCheckedSources()" style="font-size:0.88rem;padding:9px 28px">載入勾選的資料</button>
+  </div>
+
+  <div style="color:var(--muted);font-size:0.75rem;margin-bottom:12px">── 或選擇本機檔案 ──</div>
+  <button class="btn-upload" onclick="document.getElementById('fileInput').click()" style="background:var(--panel2);color:var(--text);border:1px solid var(--border)">📁 選擇本機檔案</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+</div>
+
+<!-- 已載入的來源清單（多筆模式） -->
+<div class="source-list" id="sourceList" style="display:none"></div>
+<div class="add-source-btn" id="addSourceBtn" style="display:none">
+  <button class="btn-add" onclick="document.getElementById('fileInputMore').click()" style="font-size:0.82rem;padding:7px 16px">＋ 新增來源</button>
+  <button class="btn btn-primary" onclick="mergeAndAnalyze()" style="font-size:0.82rem;padding:7px 20px">合併分析</button>
+  <button class="btn btn-ghost" onclick="resetAll()" style="font-size:0.78rem;padding:7px 14px">清除全部</button>
+  <input type="file" id="fileInputMore" accept=".xlsx,.xls" style="display:none" onchange="handleFileMore(this.files[0])">
+</div>
+
+<div class="filter-bar" id="filterBar">
+  <div class="filter-row">
+    <div class="field"><label>時間範圍（起）</label><input type="month" id="dateFrom"></div>
+    <div class="field"><label>時間範圍（迄）</label><input type="month" id="dateTo"></div>
+    <div class="field"><label>車位規格（坪）</label>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div id="parkingTags" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        <input type="number" id="parkingInput" placeholder="輸入後Enter" min="1" max="30" step="0.5"
+          style="width:110px;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.82rem;outline:none;font-family:'DM Mono',monospace"
+          onkeydown="if(event.key==='Enter')addParkingSize()">
+        <button onclick="addParkingSize()" class="btn-add" style="padding:5px 10px;font-size:0.78rem">＋</button>
+      </div>
+    </div>
+    <div class="field" style="min-width:200px"><label>地址篩選</label>
+      <!-- 各路段各自的巷號區塊（動態產生）-->
+      <div id="segBlocksWrap"></div>
+      <!-- 號碼範圍 -->
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;margin-top:4px">
+        <span style="font-size:0.72rem;color:var(--muted);white-space:nowrap">號碼/巷 ≥</span>
+        <input type="number" id="addrNumFrom" placeholder="如：300" min="0"
+          style="width:72px;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:0.85rem;outline:none;font-family:'DM Mono',monospace"
+          oninput="updateAddrHint();updateLaneCheckboxes()">
+        <span style="font-size:0.72rem;color:var(--muted)">～ ≤</span>
+        <input type="number" id="addrNumTo" placeholder="如：565" min="0"
+          style="width:72px;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:0.85rem;outline:none;font-family:'DM Mono',monospace"
+          oninput="updateAddrHint();updateLaneCheckboxes()">
+      </div>
+      <div id="addrHint" style="font-size:0.68rem;color:var(--accent3);margin-top:2px;font-family:'DM Mono',monospace;min-height:14px"></div>
+    </div>
+    <input type="hidden" id="addrKeyword" value="">
+    <input type="hidden" id="addrLane" value="">
+    <div class="field"><label>棟別篩選</label>
+      <select id="blockFilter"><option value="">全部</option></select>
+    </div>
+    <div class="field"><label>用途篩選</label>
+      <select id="usageFilter"><option value="">全部</option></select>
+    </div>
+    <div class="field"><label>格局篩選</label>
+      <select id="roomFilter">
+        <option value="0">全部格局</option>
+        <option value="1">1房</option>
+        <option value="2">2房</option>
+        <option value="3">3房</option>
+        <option value="4">4房以上</option>
+      </select>
+    </div>
+    <div class="field"><label>樓層篩選</label>
+      <select id="floorPreset" onchange="onFloorPresetChange()">
+        <option value="">全部</option><option value="low">低樓層（1～5F）</option>
+        <option value="mid">中樓層（6～15F）</option><option value="high">高樓層（16F以上）</option>
+        <option value="custom">自訂…</option>
+      </select>
+    </div>
+    <div class="field" id="floorCustomField" style="display:none;"><label>自訂樓層</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" id="floorMin" placeholder="最低" min="1" style="width:72px;">
+        <span style="color:var(--muted);font-size:0.82rem;">～</span>
+        <input type="number" id="floorMax" placeholder="最高" min="1" style="width:72px;">
+      </div>
+    </div>
+    <div class="field"><label>單價範圍（萬/坪）</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" id="priceMin" placeholder="最低" min="0" step="0.5" style="width:72px;">
+        <span style="color:var(--muted);font-size:0.82rem;">～</span>
+        <input type="number" id="priceMax" placeholder="最高" min="0" step="0.5" style="width:72px;">
+        <span style="font-size:0.7rem;color:var(--muted)" id="priceAutoHint"></span>
+      </div>
+    </div>
+    <div class="field" style="justify-content:flex-end;display:flex;gap:8px;align-items:flex-end;">
+      <button class="btn btn-ghost" id="recalcBtn" onclick="recalcParking()" style="display:none">🔄 重新計算車位</button>
+      <button class="btn btn-primary" onclick="applyFilter()">套用篩選</button>
+    </div>
+  </div>
+</div>
+
+<div class="range-section" id="rangeSection">
+  <div class="range-header">坪數區間設定</div>
+  <div class="ranges-row" id="rangesRow">
+    <div class="add-range">
+      <input type="number" id="rangeMin" placeholder="最小坪" min="0" step="0.5">
+      <span>～</span>
+      <input type="number" id="rangeMax" placeholder="最大坪" min="0" step="0.5">
+      <button class="btn-add" onclick="addRange()">＋ 新增區間</button>
+    </div>
+  </div>
+</div>
+
+<div class="room-stats" id="roomStats" style="display:none;padding:10px 24px 0;display:none">
+  <div style="display:flex;flex-wrap:wrap;gap:8px" id="roomStatsList"></div>
+</div>
+<div class="status-bar" id="statusBar">請上傳從內政部實價登錄下載的社區成交 Excel 檔</div>
+<div class="stats-grid" id="statsGrid"></div>
+<div class="calc-card" id="calcCard" style="display:none;padding:14px 20px;margin:12px 24px 0;">
+  <div style="font-size:0.78rem;font-weight:700;color:var(--accent3);margin-bottom:10px;font-family:'DM Mono',monospace">💰 總價試算</div>
+  <div class="calc-row">
+    <span class="calc-label">單價</span>
+    <input class="calc-input" type="number" id="calcPrice" placeholder="萬/坪" step="0.5" oninput="runCalc()">
+    <span class="calc-label">×</span>
+    <select id="calcRoomSel" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-size:0.85rem;outline:none;" onchange="runCalc()">
+      <option value="">選房型</option>
+    </select>
+    <span class="calc-label" id="calcAreaLabel" style="color:var(--accent)"></span>
+    <span class="calc-label">=</span>
+    <span class="calc-result" id="calcResult">—<span>萬</span></span>
+  </div>
+  <div id="calcRangeHint" style="font-size:0.7rem;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px"></div>
+</div>
+<div class="charts-area" id="chartsArea">
+  <div class="empty-state"><div class="icon">📊</div><p>上傳資料後自動產生分析圖表</p><p style="font-size:0.72rem;margin-top:4px;">月/季趨勢 · 坪數區間分析 · 年度統計</p></div>
+</div>
+
+<script>
+const PALETTE=['#e8c84a','#4a8fe8','#4ae8a0','#e84a8f','#e8804a','#a04ae8','#4ae8e8','#e8e84a'];
+let ranges=[{min:0,max:15,label:'15坪以下'},{min:15,max:30,label:'15~30坪'},{min:30,max:50,label:'30~50坪'},{min:50,max:999,label:'50坪以上'}];
+let rawData=[],charts={},currentMode='normal',currentTab='quarterly';
+let sources=[]; // [{fileName, rows, data}]
+
+// ── data/ 資料夾來源（GitHub Pages 模式）──
+async function initDataSources(){
+  try{
+    const res=await fetch('data/sources.json');
+    if(!res.ok)return; // 本機開啟時不會有這個檔案，靜默跳過
+    const sources=await res.json(); // [{name, file, mode}]
+    if(!sources?.length)return;
+    const panel=document.getElementById('dataSourcePanel');
+    const list=document.getElementById('dataSourceList');
+    if(!panel||!list)return;
+    panel.style.display='block';
+    list.innerHTML=sources.map((s,i)=>`
+      <label style="display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left">
+        <input type="checkbox" id="dsrc_${i}" value="${i}" checked style="width:16px;height:16px;accent-color:var(--accent)">
+        <span style="font-size:0.85rem;color:var(--accent3);flex:1">${s.name}</span>
+        <span style="font-size:0.7rem;color:var(--muted);font-family:'DM Mono',monospace">${s.mode==='townhouse'?'透天':'一般住宅'}</span>
+      </label>`).join('');
+    // 把 sources 存起來供載入用
+    window._dataSources=sources;
+  }catch(e){
+    // 本機檔案模式，正常跳過
+  }
+}
+
+async function loadCheckedSources(){
+  const sources=window._dataSources||[];
+  const checked=sources.filter((_,i)=>document.getElementById(`dsrc_${i}`)?.checked);
+  if(!checked.length){setStatus('請至少勾選一個來源','error');return;}
+  setStatus(`載入中，共 ${checked.length} 個來源…`);
+  for(const s of checked){
+    try{
+      const res=await fetch(`data/${s.file}`);
+      if(!res.ok)throw new Error(`${s.file} 載入失敗 (${res.status})`);
+      const buf=await res.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      // 暫時切換 mode 讓 parser 用對的
+      const prevMode=currentMode;
+      currentMode=s.mode||'normal';
+      addSource(rows,s.name);
+      currentMode=prevMode;
+    }catch(err){
+      setStatus(`${s.name} 載入失敗：${err.message}`,'error');
+    }
+  }
+}
+function setMode(mode){
+  currentMode=mode;
+  ['normal','townhouse'].forEach(m=>{
+    document.getElementById('btn-'+m).classList.toggle('active',m===mode);
+  });
+  const hints={
+    normal:'從內政部實價登錄「社區/個案查詢」匯出的 Excel<br>支援 <code>.xlsx</code> / <code>.xls</code> 格式',
+    townhouse:'請從 <strong>5168 比價王</strong> 下載透天成交 Excel<br>欄位格式：成交時間/地址/型態/總價/單價/建坪/地坪/樓高/屋齡/成交次數',
+  };
+  document.getElementById('uploadHint').innerHTML=hints[mode];
+}
+
+// ── 車位規格管理 ──
+let parkingSizes=[];
+function renderParkingTags(){
+  const container=document.getElementById('parkingTags');
+  if(!container)return;
+  container.innerHTML=parkingSizes.map((s,i)=>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.78rem;font-family:'DM Mono',monospace">
+      ${s}坪<span onclick="removeParkingSize(${i})" style="cursor:pointer;color:var(--muted);margin-left:2px" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--muted)'">×</span>
+    </span>`
+  ).join('');
+}
+function addParkingSize(){
+  const val=parseFloat(document.getElementById('parkingInput').value);
+  if(isNaN(val)||val<1||val>30)return;
+  if(!parkingSizes.includes(val)){parkingSizes.push(val);parkingSizes.sort((a,b)=>a-b);renderParkingTags();}
+  document.getElementById('parkingInput').value='';
+}
+function removeParkingSize(i){parkingSizes.splice(i,1);renderParkingTags();}
+function getBestParkingDeduction(totalArea,carCount){
+  if(carCount===0||parkingSizes.length===0)return 0;
+  function combos(n,sizes){if(n===0)return[0];const result=[];for(const s of sizes)for(const rest of combos(n-1,sizes))result.push(s+rest);return[...new Set(result)];}
+  const allCombos=combos(carCount,parkingSizes);
+  let best=allCombos[0],bestScore=Infinity;
+  for(const c of allCombos){const net=totalArea-c;if(net<5)continue;const score=Math.abs(net-Math.round(net));if(score<bestScore){bestScore=score;best=c;}}
+  return best||allCombos[0];
+}
+
+// ── 坪數區間管理 ──
+function renderRanges(){
+  const row=document.getElementById('rangesRow');
+  const form=row.querySelector('.add-range');
+  row.querySelectorAll('.range-tag').forEach(el=>el.remove());
+  ranges.forEach((r,i)=>{
+    const tag=document.createElement('div');tag.className='range-tag';
+    tag.innerHTML=`<span class="dot" style="background:${PALETTE[i%PALETTE.length]}"></span><span>${r.label}</span><span class="remove" onclick="removeRange(${i})">x</span>`;
+    row.insertBefore(tag,form);
+  });
+}
+function addRange(){
+  const minVal=document.getElementById('rangeMin').value,maxVal=document.getElementById('rangeMax').value;
+  const hasMin=minVal!=='',hasMax=maxVal!=='';
+  if(!hasMin&&!hasMax){alert('請至少輸入最小坪或最大坪');return;}
+  const min=hasMin?parseFloat(minVal):0,max=hasMax?parseFloat(maxVal):999;
+  if(hasMin&&hasMax&&min>=max){alert('最小坪必須小於最大坪');return;}
+  let label=hasMin&&!hasMax?`${min}坪以上`:!hasMin&&hasMax?`${max}坪以下`:`${min}~${max}坪`;
+  ranges.push({min,max,label});ranges.sort((a,b)=>a.min-b.min);
+  document.getElementById('rangeMin').value='';document.getElementById('rangeMax').value='';
+  renderRanges();if(rawData.length)renderAll(getFiltered());
+}
+function removeRange(i){ranges.splice(i,1);renderRanges();if(rawData.length)renderAll(getFiltered());}
+function autoSetRanges(data){
+  const hasLookup = typeof UNIT_LOOKUP !== 'undefined' && Object.keys(UNIT_LOOKUP).length > 0;
+  const newRanges=[];
+
+  if(hasLookup){
+    // ── 有 UNIT_LOOKUP：直接從第二頁資料取各房型的 min/max 淨坪 ──
+    // min 向下取整，max 無條件進位到下一個5的倍數（留緩衝，避免邊界誤差）
+    const groupDefs=[
+      {label:'套房',   rmFilter:r=>r.rooms<=1, minArea:5},
+      {label:'2房',    rmFilter:r=>r.rooms===2, minArea:10},
+      {label:'3房',    rmFilter:r=>r.rooms===3, minArea:20},
+      {label:'4房以上',rmFilter:r=>r.rooms>=4,  minArea:30},
+    ];
+    groupDefs.forEach(({label,rmFilter,minArea})=>{
+      const units=Object.values(UNIT_LOOKUP)
+        .filter(u=>u.rooms!=null && rmFilter(u) && u.netArea>=minArea)
+        .map(u=>u.netArea)
+        .sort((a,b)=>a-b);
+      if(!units.length)return;
+      const minP=Math.floor(units[0]);
+      const maxP=Math.ceil(units[units.length-1]); // 無條件進位到整數
+      newRanges.push({min:minP, max:maxP+1, label:`${label}(${minP}~${maxP}坪)`});
+    });
+  } else {
+    // ── 沒有 UNIT_LOOKUP：從成交資料估算（IQR）──
+    const residential=data.filter(d=>!d.isSpecial&&(!d.usage||d.usage.includes('住')));
+    const base=residential.length>=4?residential:data;
+    const groupDefs=[
+      {label:'套房',   filter:d=>d.rooms<=1&&d.rooms>=0, minArea:5},
+      {label:'2房',    filter:d=>d.rooms===2,            minArea:15},
+      {label:'3房',    filter:d=>d.rooms===3,            minArea:20},
+      {label:'4房以上',filter:d=>d.rooms>=4,             minArea:30},
+    ];
+    groupDefs.forEach(({label,filter,minArea})=>{
+      const rows=base.filter(filter)
+        .filter(d=>label==='套房'?true:d.rooms>0)
+        .filter(d=>(d.netArea||d.area)>=minArea);
+      if(rows.length<1)return;
+      const areas=rows.map(r=>r.netArea||r.area).sort((a,b)=>a-b);
+      const minP=Math.floor(areas[0]);
+      const maxP=Math.ceil(areas[areas.length-1]);
+      newRanges.push({min:minP, max:maxP+1, label:`${label}(${minP}~${maxP}坪)`});
+    });
+  }
+
+  if(newRanges.length>0){
+    ranges=newRanges;
+    renderRanges();
+  }
+}
+// ════════════════════════════════════════════
+// ── Parser 2：透天 5168 ──
+// ════════════════════════════════════════════
+function parseTownhouseRow(r){
+  const dateRaw=String(r['成交時間']||r['交易時間']||r['交易日期']||'').trim();
+  let date;
+  const dm=dateRaw.match(/^(\d+)[\/年](\d+)/);
+  if(dm){const roc=parseInt(dm[1]);const mon=dm[2].padStart(2,'0');if(roc<80||roc>200)return null;date=`${roc+1911}-${mon}`;}
+  else return null;
+
+  const landRaw=String(r['地坪']||'').trim();
+  const landArea=parseFloat(landRaw.replace(/,/g,'').match(/([0-9.]+)/)?.[1]||'0');
+  if(!landArea||landArea<1)return null;
+  const buildRaw=String(r['建坪']||'').trim();
+  const buildArea=parseFloat(buildRaw.replace(/,/g,'').match(/([0-9.]+)/)?.[1]||'0');
+  const totalRaw=String(r['總價']||'').trim();
+  const totalPrice=parseFloat(totalRaw.replace(/,/g,'').match(/([0-9.]+)/)?.[1]||'0');
+  if(!totalPrice||totalPrice<10)return null;
+  const unitPrice=totalPrice/landArea;
+  if(unitPrice<1||unitPrice>1000)return null;
+  const floorRaw=String(r['樓高']||'').trim();
+  const chMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+  function pf(s){const n=parseInt(s);if(!isNaN(n))return n;return chMap[s.replace(/[層樓]/g,'').trim()]||0;}
+  const parts=floorRaw.split('/');
+  return{date,type:String(r['型態']||'透天'),area:buildArea||landArea,landArea,
+    unitPrice:Math.round(unitPrice*10)/10,totalPrice,
+    floor:parts.length>=1?pf(parts[0].trim()):0,
+    totalFloor:parts.length>=2?pf(parts[1].trim()):0,
+    rooms:0,netArea:landArea,carCount:0,layout:'',usage:'住家用',elevator:'無',
+    houseNum:'',address:String(r['地址']||''),community:String(r['社區名稱']||''),
+    isSpecial:false,specialLabel:'',isSpecialFloor:false,block:''};
+}
+
+
+function removeOutliers(data){
+  const hasLookup = typeof UNIT_LOOKUP !== 'undefined' && Object.keys(UNIT_LOOKUP).length > 0;
+  if(hasLookup){
+    // 有對照表：全部保留，isSpecial 只做標記，不排除任何資料
+    // 特殊戶型會在 UNIT 分析區塊另外顯示
+    return data;
+  }
+  // 沒有對照表：用 IQR 排除正常戶型的坪數異常，特殊戶型保留不做 IQR
+  const specials=data.filter(r=>r.isSpecial);   // 特殊戶型另外保存
+  const normal=data.filter(r=>!r.isSpecial);     // 只對正常戶型做 IQR
+  const groups={};
+  normal.forEach(r=>{const key=r.rooms;if(!groups[key])groups[key]=[];groups[key].push(r);});
+  let cleaned=[];
+  Object.values(groups).forEach(rows=>{
+    if(rows.length<4){cleaned.push(...rows);return;}
+    const areas=rows.map(r=>r.netArea||r.area).sort((a,b)=>a-b);
+    const q1=areas[Math.floor(areas.length*0.25)],q3=areas[Math.floor(areas.length*0.75)],iqr=q3-q1;
+    rows.forEach(r=>{
+      const a=r.netArea||r.area;
+      if(a>=q1-iqr*1.5&&a<=q3+iqr*1.5)cleaned.push(r);
+    });
+  });
+  if(cleaned.length>=4){
+    const prices=cleaned.map(r=>r.unitPrice).sort((a,b)=>a-b);
+    const q1=prices[Math.floor(prices.length*0.25)];
+    const q3=prices[Math.floor(prices.length*0.75)];
+    const iqr=q3-q1;
+    const lo=q1-iqr*1.5, hi=q3+iqr*1.5;
+    cleaned=cleaned.filter(r=>r.unitPrice>=lo&&r.unitPrice<=hi);
+  }
+  // 特殊戶型加回 rawData（供 buildSpecialList 顯示，但不進入圖表計算）
+  return [...cleaned, ...specials];
+}
+function autoSetPriceHint(data){
+  // 計算單價 IQR 合理範圍，顯示為建議並預填欄位
+  if(data.length<4)return;
+  const prices=data.map(r=>r.unitPrice).sort((a,b)=>a-b);
+  const q1=prices[Math.floor(prices.length*0.25)];
+  const q3=prices[Math.floor(prices.length*0.75)];
+  const iqr=q3-q1;
+  const lo=Math.max(1,Math.floor(q1-iqr*1.5));
+  const hi=Math.ceil(q3+iqr*1.5);
+  const hint=document.getElementById('priceAutoHint');
+  if(hint)hint.textContent=`自動建議 ${lo}～${hi}`;
+  // 只顯示建議值，不自動填入（讓用戶自己決定）
+}
+
+
+// ── 樓層篩選 ──
+function onFloorPresetChange(){document.getElementById('floorCustomField').style.display=document.getElementById('floorPreset').value==='custom'?'flex':'none';}
+function getFloorFilter(){
+  const v=document.getElementById('floorPreset').value;
+  if(!v)return null;
+  if(v==='low')return{min:1,max:5};if(v==='mid')return{min:6,max:15};if(v==='high')return{min:16,max:999};
+  if(v==='custom')return{min:parseInt(document.getElementById('floorMin').value)||1,max:parseInt(document.getElementById('floorMax').value)||999};
+  return null;
+}
+
+// ── 檔案讀取 ──
+function destroyCharts(){Object.values(charts).forEach(c=>c.destroy());charts={};}
+function setStatus(msg,type=''){const b=document.getElementById('statusBar');b.className='status-bar '+type;b.textContent=msg;}
+
+function readExcel(file, callback){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws1=wb.Sheets[wb.SheetNames[0]];
+      // 先讀原始陣列偵測格式
+      const rawArr=XLSX.utils.sheet_to_json(ws1,{header:1,defval:''});
+      const firstCell=String(rawArr[0]?.[0]||'');
+      const isGovFormat=firstCell.includes('買賣案件')||firstCell.includes('不動產交易');
+      let rows;
+      if(isGovFormat){
+        // 政府原始格式：第0列=說明，第1列=欄位名，第2列起=資料
+        const headers=rawArr[1];
+        rows=rawArr.slice(2).map(r=>{
+          const obj={};
+          headers.forEach((h,i)=>{if(h)obj[String(h).trim()]=r[i]??'';});
+          return obj;
+        }).filter(r=>Object.values(r).some(v=>v!==''));
+      } else {
+        rows=XLSX.utils.sheet_to_json(ws1,{defval:''});
+      }
+      let sheet2Rows=null;
+      if(wb.SheetNames.length>1){
+        const ws2=wb.Sheets[wb.SheetNames[1]];
+        sheet2Rows=XLSX.utils.sheet_to_json(ws2,{header:1,defval:''});
+      }
+      callback(rows,file.name,sheet2Rows);
+    }catch(err){setStatus('讀取失敗：'+err.message,'error');console.error(err);}
+  };
+  reader.readAsBinaryString(file);
+}
+
+function handleFile(file){
+  if(!file)return;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){alert('請上傳 .xlsx 或 .xls 格式');return;}
+  readExcel(file,(rows,name,sheet2Rows)=>{
+    addSource(rows,name,sheet2Rows);
+  });
+  document.getElementById('fileInput').value='';
+}
+
+function handleFileMore(file){
+  if(!file)return;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){alert('請上傳 .xlsx 或 .xls 格式');return;}
+  readExcel(file,(rows,name,sheet2Rows)=>{
+    addSource(rows,name,sheet2Rows);
+  });
+  document.getElementById('fileInputMore').value='';
+}
+
+function addSource(rows,fileName,sheet2Rows){
+  const parsers={normal:parseRow,townhouse:parseTownhouseRow};
+  const parser=parsers[currentMode]||parseRow;
+  const parsed=rows.map(parser).filter(Boolean);
+  if(!parsed.length){setStatus(`「${fileName}」找不到有效資料，請確認欄位格式`,'error');return;}
+  sources.push({fileName,rows,data:parsed,sheet2Rows:sheet2Rows||null});
+  document.getElementById('uploadZone').style.display='none';
+  renderSourceList();
+  // 只有一筆來源時直接觸發合併分析（不需手動按按鈕）
+  if(sources.length===1){
+    mergeAndAnalyze();
+  } else {
+    setStatus(`已加入「${fileName}」（${parsed.length} 筆），可繼續新增來源或直接合併分析`,'success');
+  }
+}
+
+function renderSourceList(){
+  const el=document.getElementById('sourceList');
+  const btn=document.getElementById('addSourceBtn');
+  if(!sources.length){el.style.display='none';btn.style.display='none';return;}
+  el.style.display='flex';
+  btn.style.display='flex';
+  const modeLabels={normal:'社區匯出',townhouse:'透天5168'};
+  el.innerHTML=sources.map((s,i)=>`
+    <div class="source-item">
+      <span style="font-size:1rem">📄</span>
+      <span class="src-name">${s.fileName}</span>
+      <span class="src-count">${s.data.length} 筆</span>
+      <span class="mode-label" style="font-size:0.65rem">${modeLabels[currentMode]||currentMode}</span>
+      <span class="src-del" onclick="removeSource(${i})" title="移除">×</span>
+    </div>`).join('');
+}
+
+function removeSource(i){
+  sources.splice(i,1);
+  if(!sources.length){
+    document.getElementById('uploadZone').style.display='block';
+    renderSourceList();
+    const kwSel=document.getElementById('addrKeyword');
+  if(kwSel){kwSel.innerHTML='<option value="">全部路段</option>';kwSel.value='';kwSel.style.display='none';}
+  const laneWrap=document.getElementById('laneCheckboxWrap');
+  const laneList=document.getElementById('laneCheckboxList');
+  if(laneWrap)laneWrap.style.display='none';
+  if(laneList)laneList.innerHTML='';
+  const nf=document.getElementById('addrNumFrom'),nt=document.getElementById('addrNumTo');
+  if(nf)nf.value='';if(nt)nt.value='';
+  window._addrLaneMap={};
+  const sbw=document.getElementById('segBlocksWrap');if(sbw)sbw.innerHTML='';
+  setStatus('請上傳從內政部實價登錄下載的社區成交 Excel 檔');
+  } else {
+    renderSourceList();
+    setStatus(`已移除，目前 ${sources.length} 個來源`,'success');
+  }
+}
+
+function mergeAndAnalyze(){
+  if(!sources.length)return;
+  const allRows=sources.flatMap(s=>s.rows);
+  const allData=sources.flatMap(s=>s.data);
+  window._originalRows=allRows;
+  window._originalData=[...allData];
+  // 第二頁用第一個來源的（多來源時以第一個社區的對照表為主）
+  const sheet2=sources[0]?.sheet2Rows||null;
+  processRows(allRows, sources.map(s=>s.fileName).join(' + '), allData, sheet2);
+}
+
+function processRows(rows, fileName, preData, sheet2Rows){
+  // ── 動態讀取第二頁對照表 ──
+  if(sheet2Rows && sheet2Rows.length){
+    loadUnitLookupFromSheet2(sheet2Rows);
+  } else {
+    // 沒有第二頁，清空對照表
+    UNIT_LOOKUP={};SPECIAL_FLOORS=[];SPECIAL_FLOOR_DESC={};COMMUNITY_PARK_SIZES=[];
+    parkingSizes=[];renderParkingTags();
+  }
+
+  const parsers={normal:parseRow,townhouse:parseTownhouseRow};
+  const parser=parsers[currentMode]||parseRow;
+
+  // 第一輪 parser：取得基本資料用於偵測建物類型
+  window._isApartmentMode = false; // 先預設
+  const firstPass=rows.map(parser).filter(Boolean);
+  if(!firstPass.length){setStatus('找不到有效資料，請確認欄位格式','error');return;}
+
+  // 偵測建物類型：總樓層<=5 且 無電梯 的比例>=60% → 公寓/透天模式
+  const aptCount=firstPass.filter(r=>r.totalFloor>0&&r.totalFloor<=5&&r.elevator!=='有');
+  const ratio=firstPass.length>0?aptCount.length/firstPass.length:0;
+  window._isApartmentMode = ratio >= 0.6;
+
+  // 第二輪 parser：用正確的 _isApartmentMode 重跑，得到正確的 specialLabel
+  rawData=rows.map(parser).filter(Boolean);
+  window._originalData=[...rawData];
+  window._originalRows=rows;
+
+  document.getElementById('filterBar').style.display='block';
+  document.getElementById('rangeSection').style.display='block';
+
+  const dates=rawData.map(d=>d.date).sort();
+  document.getElementById('dateFrom').value=(dates[0]||'').slice(0,7);
+  document.getElementById('dateTo').value=(dates[dates.length-1]||'').slice(0,7);
+
+  const usages=[...new Set(rawData.map(r=>r.usage).filter(Boolean))].sort();
+  document.getElementById('usageFilter').innerHTML='<option value="">全部</option>'+usages.map(u=>`<option value="${u}">${u}</option>`).join('');
+  const blocks=[...new Set(rawData.map(r=>r.block).filter(Boolean))].sort();
+  const blockSel=document.getElementById('blockFilter');
+  if(blockSel)blockSel.innerHTML='<option value="">全部</option>'+blocks.map(b=>`<option value="${b}">${b}</option>`).join('');
+
+  rawData=removeOutliers(rawData);
+  document.getElementById('recalcBtn').style.display='none';
+
+  // 自動套用社區車位大小（從 Excel 第二頁讀取，全社區共用）
+  if(typeof COMMUNITY_PARK_SIZES!=='undefined'&&COMMUNITY_PARK_SIZES.length){
+    parkingSizes=[...COMMUNITY_PARK_SIZES];renderParkingTags();
+  }
+  const modeLabels={normal:'社區匯出',townhouse:'透天5168'};
+  const hasLookupNow = typeof UNIT_LOOKUP !== 'undefined' && Object.keys(UNIT_LOOKUP).length > 0;
+  const specialCount = rawData.filter(r=>r.isSpecial).length;
+  const statusNote = hasLookupNow
+    ? (specialCount > 0 ? `含 ${specialCount} 筆特殊戶型已標記` : '已依對照表驗證')
+    : '已排除異常值';
+  setStatus(`合併 ${sources.length} 個來源，共 ${rawData.length} 筆成交資料（${statusNote}）`,'success');
+  autoSetRanges(rawData);
+  autoSetPriceHint(rawData);
+  buildAddrOptions(rawData);
+  renderAll(getFiltered());
+}
+
+// ════════════════════════════════════════════
+
+// ════════════════════════════════════════════
+// ── 門牌戶型對照表（從 Excel 第二頁讀取）──
+// ════════════════════════════════════════════
+let UNIT_LOOKUP = {}; // 由第二頁資料動態載入
+// 全社區特殊條件樓層（1樓=挑高、14樓=樓中樓）—— 正常成交但需註記
+let SPECIAL_FLOORS = []; // 由第二頁資料動態載入
+let SPECIAL_FLOOR_DESC = {}; // 由第二頁資料動態載入
+// 全社區車位大小（兩種規格，與門牌無關）
+let COMMUNITY_PARK_SIZES = []; // 由第二頁資料動態載入
+
+
+// ════════════════════════════════════════════
+// ── 動態讀取 Excel 第二頁建立對照表 ──
+// ════════════════════════════════════════════
+function loadUnitLookupFromSheet2(rows){
+  // rows 是 XLSX.utils.sheet_to_json 的結果（header:false，row 是 array）
+  // 格式：第0欄是標籤（門牌/坪數/房型/棟別/車位大小/特殊條件），其餘欄是各門牌資料
+  if(!rows || !rows.length) return;
+
+  // 找各列的 index（以第0欄的值判斷）
+  const labelMap = {};
+  rows.forEach((row, i) => {
+    const label = String(row[0]||'').trim();
+    if(label) labelMap[label] = i;
+  });
+
+  const houseRow   = rows[labelMap['門牌']   ?? 0];
+  const areaRow    = rows[labelMap['坪數']   ?? 1];
+  const roomRow    = rows[labelMap['房型']   ?? 2];
+  const blockRow   = rows[labelMap['棟別']   ?? 3];
+  const parkRow    = rows[labelMap['車位大小'] ?? 11];
+  const specialRow = rows[labelMap['特殊條件'] ?? 12];
+
+  if(!houseRow) return;
+
+  // 清空舊資料
+  UNIT_LOOKUP = {};
+  SPECIAL_FLOORS = [];
+  SPECIAL_FLOOR_DESC = {};
+  const parkSizeSet = new Set();
+
+  // ── 先掃描整列收集車位大小（全社區共用規格，不綁門牌）──
+  if(parkRow){
+    for(let i = 1; i < parkRow.length; i++){
+      const parkRaw = String(parkRow[i]||'').trim();
+      if(parkRaw && parkRaw !== 'nan'){
+        const ps = parseFloat(parkRaw);
+        if(!isNaN(ps) && ps > 0) parkSizeSet.add(ps);
+      }
+    }
+  }
+
+  // ── 先掃描特殊條件列（全社區共用，不綁門牌）──
+  if(specialRow){
+    for(let i = 1; i < specialRow.length; i++){
+      const specRaw = String(specialRow[i]||'').trim();
+      if(specRaw && specRaw !== 'nan'){
+        // 可能格式：「1樓」「14樓」「1樓挑高4.2米」「14樓6米樓中樓」
+        const floorMatch = specRaw.match(/(\d+)樓/);
+        if(floorMatch){
+          const f = parseInt(floorMatch[1]);
+          if(!SPECIAL_FLOORS.includes(f)) SPECIAL_FLOORS.push(f);
+          // 描述：去掉樓層數字和「樓」字，剩下的就是描述；若沒有則用預設
+          const desc = specRaw.replace(/^\d+樓/, '').trim();
+          SPECIAL_FLOOR_DESC[f] = desc || (f === 1 ? '挑高' : '樓中樓');
+        }
+      }
+    }
+  }
+
+  // ── 逐欄建立門牌對照表（只存坪數/房型/棟別）──
+  const colCount = Object.keys(houseRow).length;
+  for(let i = 1; i < colCount; i++){
+    const houseRaw = String(houseRow[i]||'').trim();
+    if(!houseRaw || houseRaw === 'nan') continue;
+    const houseNum = houseRaw.replace('號','');
+    const netArea  = parseFloat(areaRow?.[i]) || null;
+    const rooms    = parseInt(roomRow?.[i])   || null;
+    const block    = String(blockRow?.[i]||'').trim() || null;
+    UNIT_LOOKUP[houseNum] = {netArea, rooms, block};
+  }
+
+  // ── 更新全社區車位規格 ──
+  COMMUNITY_PARK_SIZES = [...parkSizeSet].sort((a,b)=>a-b);
+  if(COMMUNITY_PARK_SIZES.length){
+    parkingSizes = [...COMMUNITY_PARK_SIZES];
+    renderParkingTags();
+  }
+
+  console.log('UNIT_LOOKUP 載入完成:', Object.keys(UNIT_LOOKUP).length, '筆');
+  console.log('車位大小:', COMMUNITY_PARK_SIZES);
+  console.log('特殊條件樓層:', SPECIAL_FLOORS);
+}
+
+// ════════════════════════════════════════════
+// ── Parser 1：社區匯出（含新版欄位）──
+// ════════════════════════════════════════════
+function parseRow(r){
+  // ── 排除頁尾說明列 ──
+  // 支援兩種地址欄位名稱：「地址」（社區匯出）/ 「地段位置或門牌」（政府原始格式）
+  const addrRaw=String(r['地址']||r['地段位置或門牌']||'').trim();
+  if(!addrRaw)return null;
+  if(addrRaw.includes('顯示')&&addrRaw.includes('筆'))return null;
+  if(addrRaw==='地段位置或門牌')return null;
+
+  // ── 排除親友、員工、特殊關係交易（政府原始格式備註欄）──
+  const noteRaw=String(r['備註']||'').trim();
+  if(noteRaw.includes('親友')||noteRaw.includes('員工')||noteRaw.includes('特殊關係'))return null;
+
+  // ── 日期（支援 114/09/16 完整日期、114/09 月份、舊格式）──
+  const dateRaw=String(r['交易時間']||r['交易日期']||r['成交年月']||'').trim();
+  let date;
+  const dmFull=dateRaw.match(/^(\d+)\/(\d+)\/\d+/);
+  const dmMon =dateRaw.match(/^(\d+)\/(\d+)/);
+  const dmOld =dateRaw.match(/(\d+)[年](\d+)/);
+  if(dmFull){const roc=parseInt(dmFull[1]);const mon=dmFull[2].padStart(2,'0');if(roc<80||roc>200)return null;date=`${roc+1911}-${mon}`;}
+  else if(dmMon){const roc=parseInt(dmMon[1]);const mon=dmMon[2].padStart(2,'0');if(roc<80||roc>200)return null;date=`${roc+1911}-${mon}`;}
+  else if(dmOld){const roc=parseInt(dmOld[1]);const mon=dmOld[2].padStart(2,'0');if(roc<80||roc>200)return null;date=`${roc+1911}-${mon}`;}
+  else return null;
+
+  const typeRaw=String(r['型態']||'').trim();
+  if(typeRaw==='車位')return null;
+
+  const unitKey=Object.keys(r).find(k=>k==='單價'||k.includes('單價'))||'單價';
+  const unitRaw=String(r[unitKey]||'').trim();
+  if(!unitRaw||unitRaw==='-'||unitRaw==='--')return null;
+  const unitPrice=parseFloat(unitRaw.replace(/,/g,''));
+  if(!unitPrice||isNaN(unitPrice)||unitPrice<3||unitPrice>600)return null;
+
+  const areaKey=Object.keys(r).find(k=>k==='坪數'||k.includes('總面積'))||'坪數';
+  const areaRaw=String(r[areaKey]||r['坪數']||r['建坪']||'').trim();
+  const area=parseFloat(areaRaw.replace(/,/g,'').match(/([\d.]+)/)?.[1]||'0');
+  if(!area||area<3)return null;
+
+  const floorRaw=String(r['樓別/樓高']||r['樓高']||r['樓別']||'').trim();
+  const chMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20,'二十一':21,'二十二':22,'二十三':23,'二十四':24,'二十五':25,'三十':30,'四十':40,'五十':50};
+  function pf(s){s=s.replace(/[層樓Ff夾騎樓]/g,'').trim();const n=parseInt(s);if(!isNaN(n))return n;return chMap[s]||0;}
+  const slashIdx=floorRaw.indexOf('/');
+  const floorPart=slashIdx>-1?floorRaw.slice(0,slashIdx):floorRaw;
+  const totalPart=slashIdx>-1?floorRaw.slice(slashIdx+1):'';
+  const floor=pf(floorPart.split(',')[0].trim());
+  const totalFloor=pf(totalPart);
+
+  const totalKey=Object.keys(r).find(k=>k==='總價'||k.includes('總價')&&!k.includes('車位'))||'總價';
+  const totalRaw=String(r[totalKey]||'').trim();
+  const totalPrice=parseFloat(totalRaw.replace(/,/g,'').match(/([\d.]+)/)?.[1]||'0')||Math.round(unitPrice*area);
+
+  const stdRaw=String(r['交易標的']||'').trim();
+  const carMatch=stdRaw.match(/車([0-9]+)/);
+  const hasCarInStd=stdRaw.includes('車位');
+  const parkKey=Object.keys(r).find(k=>k==='車位價格'||k==='車位總價'||k.includes('車位總價'))||'車位總價';
+  const parkingRaw=String(r[parkKey]||r['車位價格']||'').trim();
+  const parking=(parkingRaw&&parkingRaw!=='NaN')?parseFloat(parkingRaw.replace(/,/g,''))||0:0;
+  const carCount=carMatch?parseInt(carMatch[1]):((hasCarInStd||parking>0)?1:0);
+  const adjTotal=(totalPrice-parking)>50?totalPrice-parking:totalPrice;
+  const parkingDeduction=getBestParkingDeduction(area,carCount);
+  const netArea=area-parkingDeduction;
+  const finalArea=netArea>=5?netArea:area;
+
+  const elevator=String(r['電梯']||'').trim();
+  let type;
+  if(elevator==='無'){type=floorRaw.includes('全')?'透天':'公寓';}
+  else{type=(totalFloor>0&&totalFloor<=10)?'華廈':'住宅大樓';}
+
+  // ── 格局解析 + 特殊戶型判定 ──
+  const layoutRaw=String(r['格局']||r['建物格局']||r['建物現況格局']||'').trim();
+  const roomMatch=layoutRaw.match(/^([0-9]+)房/);
+  const rooms=roomMatch?parseInt(roomMatch[1]):0;
+  // 特殊戶型：5房以上、沒有「N房」開頭（2廳1衛、無隔間等）
+  const isSpecial=rooms>=5||(!roomMatch&&layoutRaw.length>0)||layoutRaw.includes('無隔間');
+
+  function toHalf(s){return s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));}
+  const addrHalf=toHalf(addrRaw);
+  let houseNum='';
+  const laneMatch=addrHalf.match(/([0-9]+)巷/);
+  if(laneMatch){
+    houseNum=laneMatch[1];
+  } else {
+    const allNumMatches=[...addrHalf.matchAll(/([0-9]+)(?:之([0-9]+))?號/g)];
+    const lastMatch=allNumMatches[allNumMatches.length-1];
+    houseNum=lastMatch?(lastMatch[2]?`${lastMatch[1]}-${lastMatch[2]}`:lastMatch[1]):'';
+  }
+
+  // ── 查門牌對照表，補入淨坪/房型/棟別 ──
+  const unitInfo = UNIT_LOOKUP[houseNum] || null;
+  let finalRooms = rooms;
+  // 若格局空白，先嘗試從對照表取房型
+  if(!finalRooms && unitInfo?.rooms) finalRooms = unitInfo.rooms;
+  let finalNetArea = finalArea;
+  let block = '';
+
+  if(unitInfo){
+    // 用對照表的房型覆蓋（比格局欄更可靠）
+    finalRooms = unitInfo.rooms || rooms;
+    // 用對照表的淨坪（標準戶型坪數，不含車位）
+    finalNetArea = unitInfo.netArea || finalArea;
+    block = unitInfo.block || '';
+  }
+
+  // 特殊條件樓層（1樓=挑高、14樓=樓中樓）：優先判定，不管格局如何都歸這組
+  const isSpecialFloor = SPECIAL_FLOORS.includes(floor);
+  // ── 特殊戶型判定 ──
+  const layoutValid = layoutRaw && layoutRaw !== 'nan' && layoutRaw !== '-' && layoutRaw.length > 0;
+  const bathM = layoutRaw.match(/([0-9]+)衛/);
+  const hallM = layoutRaw.match(/([0-9]+)廳/);
+  const bathCount = bathM ? parseInt(bathM[1]) : 0;
+  const hallCount = hallM ? parseInt(hallM[1]) : 0;
+  const isTopFloor = totalFloor > 0 && floor === totalFloor;
+  const hasLookupNow = typeof UNIT_LOOKUP !== 'undefined' && Object.keys(UNIT_LOOKUP).length > 0;
+
+  let specialLabel = '';
+  // 偵測是否為公寓（無電梯且多數5樓以下）
+  // 用全域旗標 window._isMixedApartment，在 processRows 後設定
+  const isApartmentMode = typeof window._isApartmentMode !== 'undefined' ? window._isApartmentMode : false;
+
+  if(hasLookupNow){
+    // 有第二頁（大樓）：異常格局一律歸疑似客變
+    const isKai = rooms >= 5 || (layoutValid && !layoutRaw.match(/^[0-9]+房/)) || layoutRaw.includes('無隔間');
+    if(isKai) specialLabel = '疑似客變';
+  } else if(isApartmentMode){
+    // 公寓模式：啟用收租屋和頂樓加蓋判定
+    // 備註欄有「頂樓加蓋」或「頂樓增建」字樣
+    const noteRaw2=String(r['備註']||r['note']||'').trim();
+    const noteHasTop=noteRaw2.includes('頂樓加蓋')||noteRaw2.includes('頂樓增建');
+    // 收租屋：衛浴>=4 且 廳<=1
+    const isRental = bathCount >= 4 && hallCount <= 1;
+    // 頂樓加蓋：
+    //   1. 備註明確標注「頂樓加蓋/增建」且非收租屋
+    //   2. 頂樓 + 無電梯 + 格局異常（房>=5 或 衛>=3）+ 廳>=2 + 非收租屋
+    const isTopByNote = noteHasTop && !isRental;
+    const isTopByLayout = isTopFloor && !isRental && elevator !== '有' &&
+      (rooms >= 5 || bathCount >= 3) && hallCount >= 2;
+    const isTopBuild = isTopByNote || isTopByLayout;
+    const isKai = !isRental && !isTopBuild &&
+      ((layoutValid && !layoutRaw.match(/^[0-9]+房/)) || layoutRaw.includes('無隔間'));
+    specialLabel = isRental ? '收租屋' :
+                   isTopBuild ? '頂樓加蓋' :
+                   isKai ? '疑似客變' : '';
+  } else {
+    // 社區/大樓模式（無第二頁）：異常格局歸疑似客變，不判定收租屋頂樓加蓋
+    const isKai = rooms >= 5 || (layoutValid && !layoutRaw.match(/^[0-9]+房/)) || layoutRaw.includes('無隔間');
+    if(isKai) specialLabel = '疑似客變';
+  }
+  const finalIsSpecial = !isSpecialFloor && specialLabel !== '';
+
+  return{date,type,area,netArea:finalNetArea,carCount,unitPrice,
+    totalPrice:Math.round(adjTotal),
+    rawTotalPrice:Math.round(totalPrice),
+    parkingPrice:Math.round(parking),
+    floor,totalFloor,elevator,rooms:finalRooms,layout:layoutRaw,
+    isSpecial:finalIsSpecial,specialLabel,isSpecialFloor,block,houseNum,
+    usage:String(r['主要用途']||r['用途']||r['使用用途']||'').trim(),
+    address:addrRaw,community:String(r['社區名稱']||'')};
+}
+
+
+// ════════════════════════════════════════════
+// ── Parser 3：內政部實價登錄原始下載格式 ──
+// ════════════════════════════════════════════
+
+// ════════════════════════════════════════════
+// ── Parser：實價登錄原始格式（直接下載版）──
+// ════════════════════════════════════════════
+
+// ── 重新計算車位 ──
+function recalcParking(){
+  if(!window._originalRows?.length){alert('請先上傳 Excel');return;}
+  // 重跑 parser，這次 parkingSizes 已是最新設定，getBestParkingDeduction 會用新規格
+  const parsers={normal:parseRow,townhouse:parseTownhouseRow};
+  const parser=parsers[currentMode]||parseRow;
+  rawData=window._originalRows.map(parser).filter(Boolean);
+  rawData=removeOutliers(rawData);
+  autoSetRanges(rawData);
+  autoSetPriceHint(rawData);
+  setStatus('✓ 已依新車位規格重新計算，共 '+rawData.length+' 筆','success');
+  renderAll(getFiltered());
+}
+
+// ── 地址篩選：從資料自動產生選項 ──
+function buildAddrOptions(data){
+  if(!data||!data.length)return;
+  function toHalf(s){return s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));}
+  const numToZh={'1':'一','2':'二','3':'三','4':'四','5':'五','6':'六','7':'七','8':'八','9':'九'};
+  function parseAddrParts(addr){
+    const h=toHalf(String(addr||''));
+    const roadM=h.match(/(路|街)/);
+    if(!roadM)return{seg:'',lane:null,mainNum:null};
+    const roadEnd=roadM.index+1;
+    const beforeRoad=h.slice(0,roadM.index);
+    let prefixEnd=0;
+    const adminChars=['市','縣','區','鄉','鎮'];
+    for(let i=0;i<beforeRoad.length;i++){
+      if(adminChars.includes(beforeRoad[i]))prefixEnd=i+1;
+    }
+    let seg=h.slice(prefixEnd,roadEnd);
+    const afterRoad=h.slice(roadEnd);
+    const segM=afterRoad.match(/^([一二三四五六七八九十]{1,2}段|[1-9]段)/);
+    if(segM){seg+=segM[1].replace(/^([1-9])段$/,(_,n)=>(numToZh[n]||n)+'段');}
+    const laneM=h.match(/([0-9]+)巷/);
+    const lane=laneM?parseInt(laneM[1]):null;
+    const mainNum=lane!==null?lane:(()=>{
+      const nums=[...h.matchAll(/([0-9]+)(?:之[0-9]+)?號/g)];
+      return nums.length?parseInt(nums[nums.length-1][1]):null;
+    })();
+    return{seg,lane,mainNum};
+  }
+
+  const segLaneMap={};
+  data.forEach(r=>{
+    const addr=r.address||'';
+    if(!addr)return;
+    const{seg,lane}=parseAddrParts(addr);
+    if(!seg)return;
+    if(!segLaneMap[seg])segLaneMap[seg]=new Set();
+    if(lane!==null)segLaneMap[seg].add(lane);
+  });
+  window._addrLaneMap=segLaneMap;
+  window._addrParseAddrParts=parseAddrParts;
+
+  const segs=Object.keys(segLaneMap).sort();
+  const wrap=document.getElementById('segBlocksWrap');
+  if(!wrap)return;
+
+  wrap.innerHTML=segs.map(seg=>{
+    const lanes=[...segLaneMap[seg]].sort((a,b)=>a-b);
+    const laneHtml=lanes.length?
+      '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-height:80px;overflow-y:auto">'+
+      lanes.map(l=>
+        '<label style="display:inline-flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:0.78rem;font-family:monospace;white-space:nowrap">'+
+        '<input type="checkbox" class="lane-cb" data-seg="'+seg+'" value="'+l+'" onchange="updateAddrHint()" style="accent-color:var(--accent)">'+
+        l+'巷</label>'
+      ).join('')+'</div>':
+      '<div style="font-size:0.7rem;color:var(--muted);margin-top:2px">（無巷，使用號碼範圍篩選）</div>';
+    const ctrlHtml=lanes.length?
+      '<span style="font-size:0.65rem;color:var(--muted)">'+
+      '<span class="seg-all-btn" data-seg="'+seg+'" data-checked="true" style="cursor:pointer;color:var(--accent);margin-right:6px">全選</span>'+
+      '<span class="seg-all-btn" data-seg="'+seg+'" data-checked="false" style="cursor:pointer;color:var(--muted)">清除</span>'+
+      '</span>':'';
+    return '<div style="margin-bottom:6px;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">'+
+      '<span style="font-size:0.75rem;font-weight:600;color:var(--accent3)">'+seg+'</span>'+ctrlHtml+
+      '</div>'+laneHtml+'</div>';
+  }).join('');
+
+  // 用 event delegation 處理全選/清除，完全避免 onclick 引號問題
+  wrap.addEventListener('click',function(e){
+    const btn=e.target.closest('.seg-all-btn');
+    if(!btn)return;
+    const seg=btn.dataset.seg;
+    const checked=btn.dataset.checked==='true';
+    document.querySelectorAll('.lane-cb').forEach(cb=>{
+      if(cb.dataset.seg===seg)cb.checked=checked;
+    });
+    updateAddrHint();
+  },{once:false});
+
+    updateLaneCheckboxes();
+  updateAddrHint();
+}
+
+function selectSegLanes(seg,checked){
+  document.querySelectorAll('.lane-cb').forEach(cb=>{
+    if(cb.dataset.seg===seg)cb.checked=checked;
+  });
+  updateAddrHint();
+}
+
+function renderLaneCheckboxes(){/* 保留相容性 */}
+
+
+function updateLaneCheckboxes(){
+  // 根據號碼範圍自動勾選符合的巷號
+  const from=document.getElementById('addrNumFrom')?.value?parseInt(document.getElementById('addrNumFrom').value):null;
+  const to=document.getElementById('addrNumTo')?.value?parseInt(document.getElementById('addrNumTo').value):null;
+  if(from===null&&to===null)return;
+  document.querySelectorAll('.lane-cb').forEach(cb=>{
+    const v=parseInt(cb.value);
+    const inRange=(from===null||v>=from)&&(to===null||v<=to);
+    cb.checked=inRange;
+  });
+  updateAddrHint();
+}
+
+function selectAllLanes(checked){
+  document.querySelectorAll('.lane-cb').forEach(cb=>cb.checked=checked);
+  updateAddrHint();
+}
+
+function updateLaneOptions(){/* 保留相容性 */}
+
+function updateAddrHint(){
+  const hint=document.getElementById('addrHint');
+  if(!hint)return;
+  const from=document.getElementById('addrNumFrom')?.value||'';
+  const to=document.getElementById('addrNumTo')?.value||'';
+  const checked=[...document.querySelectorAll('.lane-cb:checked')].map(cb=>cb.value);
+  const parts=[];
+  if(from&&to)parts.push(`號碼/巷 ${from}～${to}`);
+  else if(from)parts.push(`號碼/巷 ≥${from}`);
+  else if(to)parts.push(`號碼/巷 ≤${to}`);
+  if(checked.length>0&&checked.length<=5)parts.push(`巷：${checked.join('、')}`);
+  else if(checked.length>5)parts.push(`巷：${checked.length}個已選`);
+  hint.textContent=parts.length?'篩選：'+parts.join('  '):'';
+}
+
+
+// ── 篩選 ──
+function getFiltered(){
+  const from=document.getElementById('dateFrom').value||'';
+  const to=document.getElementById('dateTo').value||'';
+  const ff=getFloorFilter();
+  const roomF=parseInt(document.getElementById('roomFilter')?.value||'0');
+  const usageF=document.getElementById('usageFilter')?.value||'';
+  const blockF=document.getElementById('blockFilter')?.value||'';
+  const addrKw=''; // 路段由 lane-cb data-seg 屬性管理
+  const addrFrom=document.getElementById('addrNumFrom')?.value?parseInt(document.getElementById('addrNumFrom').value):null;
+  const addrTo=document.getElementById('addrNumTo')?.value?parseInt(document.getElementById('addrNumTo').value):null;
+  const checkedLanes=new Set([...document.querySelectorAll('.lane-cb:checked')].map(cb=>parseInt(cb.value)));
+  const totalLanes=document.querySelectorAll('.lane-cb').length;
+  const allLanesChecked=checkedLanes.size===0||checkedLanes.size===totalLanes;
+
+  const priceMin=document.getElementById('priceMin')?.value?parseFloat(document.getElementById('priceMin').value):null;
+  const priceMax=document.getElementById('priceMax')?.value?parseFloat(document.getElementById('priceMax').value):null;
+
+  return rawData.filter(r=>{
+    if(from&&r.date<from)return false;
+    if(to&&r.date>to)return false;
+    if(ff&&r.floor){if(r.floor<ff.min||r.floor>ff.max)return false;}
+    if(roomF===1&&r.rooms!==1)return false;
+    if(roomF===2&&r.rooms!==2)return false;
+    if(roomF===3&&r.rooms!==3)return false;
+    if(roomF===4&&r.rooms<4)return false;
+    if(usageF&&r.usage!==usageF)return false;
+    if(blockF&&r.block!==blockF)return false;
+    if(priceMin!==null&&r.unitPrice<priceMin)return false;
+    if(priceMax!==null&&r.unitPrice>priceMax)return false;
+    // 全半形轉換工具
+    const toH=s=>String(s).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248))
+                           .replace(/[Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));
+    const addrNorm=toH(r.address||'');
+    const kwNorm=toH(addrKw);
+    // 取這筆的路段、巷號、主號碼
+    const laneM=addrNorm.match(/([0-9]+)巷/);
+    const thisLane=laneM?parseInt(laneM[1]):null;
+    // 從地址解析路段（去前綴）
+    function getSegFromAddr(h){
+      const rm=h.match(/(路|街)/);if(!rm)return '';
+      let pre=0;for(let i=0;i<rm.index;i++){if('市縣區鄉鎮'.includes(h[i]))pre=i+1;}
+      let s=h.slice(pre,rm.index+1);
+      const sm=h.slice(rm.index+1).match(/^([一二三四五六七八九十]{1,2}段|[1-9]段)/);
+      const nz={'1':'一','2':'二','3':'三','4':'四','5':'五','6':'六','7':'七','8':'八','9':'九'};
+      if(sm)s+=sm[1].replace(/^([1-9])段$/,(_,n)=>(nz[n]||n)+'段');
+      return s;
+    }
+    const thisSeg=getSegFromAddr(addrNorm);
+    let thisMainNum=thisLane;
+    if(thisMainNum===null){
+      const nums=[...addrNorm.matchAll(/([0-9]+)(?:之[0-9]+)?號/g)];
+      if(nums.length)thisMainNum=parseInt(nums[nums.length-1][1]);
+    }
+    // 有勾選任何 checkbox 時才篩選
+    if(!allLanesChecked){
+      // 只保留「該路段且巷號已勾選」的資料
+      // 找出這個路段有沒有被勾選的 cb
+      const segCbs=[...document.querySelectorAll('.lane-cb[data-seg="'+thisSeg+'"]')];
+      const segChecked=segCbs.filter(cb=>cb.checked);
+      const segHasAny=segCbs.length>0;
+      if(segHasAny){
+        // 這路段有 checkbox：必須有勾選且符合
+        if(!segChecked.length)return false; // 這路段沒有勾任何巷
+        if(thisLane===null)return false;
+        if(!segChecked.some(cb=>parseInt(cb.value)===thisLane))return false;
+      }
+      // 這路段沒有 checkbox（無巷）：不因為其他路段有勾而排除
+    }
+    // 號碼/巷 範圍篩選
+    if(addrFrom!==null||addrTo!==null){
+      if(thisMainNum===null)return false;
+      if(addrFrom!==null&&thisMainNum<addrFrom)return false;
+      if(addrTo!==null&&thisMainNum>addrTo)return false;
+    }
+    return true;
+  });
+}
+function applyFilter(){
+  const data=getFiltered();
+  if(!data.length){setStatus('篩選後無資料，請放寬條件','error');return;}
+  setStatus('篩選後共 '+data.length+' 筆','success');
+  renderAll(data);
+}
+function resetAll(){
+  rawData=[];sources=[];destroyCharts();
+  // 清除社區專屬對照表，避免換社區時舊資料殘留
+  UNIT_LOOKUP={};
+  SPECIAL_FLOORS=[];
+  SPECIAL_FLOOR_DESC={};
+  COMMUNITY_PARK_SIZES=[];
+  parkingSizes=[];renderParkingTags();
+  // 重設坪數區間為預設值
+  ranges=[{min:0,max:15,label:'15坪以下'},{min:15,max:30,label:'15~30坪'},{min:30,max:50,label:'30~50坪'},{min:50,max:999,label:'50坪以上'}];
+  renderRanges();
+  document.getElementById('uploadZone').style.display='block';
+  document.getElementById('sourceList').style.display='none';
+  document.getElementById('addSourceBtn').style.display='none';
+  document.getElementById('filterBar').style.display='none';
+  document.getElementById('rangeSection').style.display='none';
+  document.getElementById('statsGrid').style.display='none';
+  document.getElementById('chartsArea').innerHTML='<div class="empty-state"><div class="icon">📊</div><p>上傳資料後自動產生分析圖表</p></div>';
+  const pm=document.getElementById('priceMin'),px=document.getElementById('priceMax'),ph=document.getElementById('priceAutoHint');
+  if(pm)pm.value='';if(px)px.value='';if(ph)ph.textContent='';
+  const kwSel=document.getElementById('addrKeyword');
+  if(kwSel){kwSel.innerHTML='<option value="">全部路段</option>';kwSel.value='';kwSel.style.display='none';}
+  const laneWrap=document.getElementById('laneCheckboxWrap');
+  const laneList=document.getElementById('laneCheckboxList');
+  if(laneWrap)laneWrap.style.display='none';
+  if(laneList)laneList.innerHTML='';
+  const nf=document.getElementById('addrNumFrom'),nt=document.getElementById('addrNumTo');
+  if(nf)nf.value='';if(nt)nt.value='';
+  window._addrLaneMap={};
+  setStatus('請上傳從內政部實價登錄下載的社區成交 Excel 檔');
+}
+
+// ── 渲染 ──
+function renderAll(data){destroyCharts();renderStats(data);renderRoomStats(data);buildCalcOptions(data);renderCharts(data);}
+function renderStats(data){
+  const grid=document.getElementById('statsGrid');grid.style.display='grid';
+  const units=data.map(d=>d.unitPrice),areas=data.map(d=>d.area),totals=data.map(d=>d.totalPrice);
+  grid.innerHTML=`
+    <div class="stat-card"><div class="label">成交筆數</div><div class="value">${data.length}<span class="unit">筆</span></div></div>
+    <div class="stat-card"><div class="label">平均單價</div><div class="value">${avg(units).toFixed(1)}<span class="unit">萬/坪</span></div></div>
+    <div class="stat-card"><div class="label">平均總價</div><div class="value">${avg(totals).toFixed(0)}<span class="unit">萬</span></div></div>
+    <div class="stat-card"><div class="label">平均坪數</div><div class="value">${avg(areas).toFixed(1)}<span class="unit">坪</span></div></div>
+    <div class="stat-card"><div class="label">最低單價</div><div class="value">${Math.min(...units).toFixed(1)}<span class="unit">萬/坪</span></div></div>
+    <div class="stat-card"><div class="label">最高單價</div><div class="value">${Math.max(...units).toFixed(1)}<span class="unit">萬/坪</span></div></div>`;
+}
+
+// ── 坪效試算 ──
+function buildCalcOptions(data){
+  const card=document.getElementById('calcCard');
+  const sel=document.getElementById('calcRoomSel');
+  if(!card||!sel)return;
+  // 公寓模式不顯示總價試算
+  if(typeof window._isApartmentMode!=='undefined'&&window._isApartmentMode){
+    card.style.display='none';return;
+  }
+  card.style.display='block';
+
+  // 從 UNIT_LOOKUP 或成交資料取各房型代表坪數
+  const opts=[];
+  const hasLookup=typeof UNIT_LOOKUP!=='undefined'&&Object.keys(UNIT_LOOKUP).length>0;
+  if(hasLookup){
+    const roomMap={};
+    Object.values(UNIT_LOOKUP).forEach(u=>{
+      if(!u.rooms||!u.netArea)return;
+      const rm=u.rooms>=4?'4房以上':u.rooms+'房';
+      if(!roomMap[rm])roomMap[rm]=[];
+      roomMap[rm].push(u.netArea);
+    });
+    Object.entries(roomMap).sort().forEach(([label,areas])=>{
+      const mn=Math.min(...areas),mx=Math.max(...areas);
+      const mid=(mn+mx)/2;
+      opts.push({label,min:mn,max:mx,mid});
+    });
+  } else {
+    // 從成交資料取各房型中位數
+    const defs=[{label:'套房',filter:r=>r.rooms<=1},{label:'2房',filter:r=>r.rooms===2},{label:'3房',filter:r=>r.rooms===3},{label:'4房以上',filter:r=>r.rooms>=4}];
+    defs.forEach(({label,filter})=>{
+      const rows=data.filter(filter).map(r=>r.netArea||r.area).sort((a,b)=>a-b);
+      if(!rows.length)return;
+      const mn=rows[0],mx=rows[rows.length-1];
+      const mid=rows[Math.floor(rows.length/2)];
+      opts.push({label,min:mn,max:mx,mid});
+    });
+  }
+  window._calcOpts=opts;
+  sel.innerHTML='<option value="">選房型</option>'+opts.map((o,i)=>`<option value="${i}">${o.label} (${o.min.toFixed(0)}~${o.max.toFixed(0)}坪)</option>`).join('');
+
+  // 預填最近均價
+  const recentPrices=data.filter(r=>!r.isSpecial).slice(-20).map(r=>r.unitPrice);
+  if(recentPrices.length){
+    const recentAvg=recentPrices.reduce((a,b)=>a+b,0)/recentPrices.length;
+    document.getElementById('calcPrice').value=recentAvg.toFixed(1);
+  }
+  runCalc();
+}
+
+function runCalc(){
+  const price=parseFloat(document.getElementById('calcPrice')?.value||'0');
+  const selIdx=document.getElementById('calcRoomSel')?.value;
+  const result=document.getElementById('calcResult');
+  const areaLabel=document.getElementById('calcAreaLabel');
+  const rangeHint=document.getElementById('calcRangeHint');
+  if(!result)return;
+  if(!price||selIdx===''){
+    result.innerHTML='—<span>萬</span>';
+    if(areaLabel)areaLabel.textContent='';
+    if(rangeHint)rangeHint.textContent='';
+    return;
+  }
+  const opt=(window._calcOpts||[])[parseInt(selIdx)];
+  if(!opt)return;
+  const midTotal=Math.round(price*opt.mid);
+  const minTotal=Math.round(price*opt.min);
+  const maxTotal=Math.round(price*opt.max);
+  result.innerHTML=`${midTotal}<span>萬</span>`;
+  if(areaLabel)areaLabel.textContent=`約${opt.mid.toFixed(0)}坪`;
+  if(rangeHint)rangeHint.textContent=`${opt.label} 坪數範圍 ${opt.min.toFixed(0)}~${opt.max.toFixed(0)} 坪　→　總價約 ${minTotal}~${maxTotal} 萬`;
+}
+
+function renderRoomStats(data){
+  const el=document.getElementById('roomStats');
+  const list=document.getElementById('roomStatsList');
+  if(!el||!list)return;
+  el.style.display='block';
+  const hasLookup=typeof UNIT_LOOKUP!=='undefined'&&Object.keys(UNIT_LOOKUP).length>0;
+  const hasSpecialFloors=typeof SPECIAL_FLOORS!=='undefined'&&SPECIAL_FLOORS.length>0;
+
+  const defs=[
+    {label:'套房', filter:r=>r.rooms<=1&&r.rooms>=0, color:PALETTE[0], show:true},
+    {label:'2房',  filter:r=>r.rooms===2, color:PALETTE[1], show:true},
+    {label:'3房',  filter:r=>r.rooms===3, color:PALETTE[2], show:true},
+    {label:'4房以上', filter:r=>r.rooms>=4, color:PALETTE[3], show:true},
+    {label:'疑似客變', filter:r=>r.isSpecial&&r.specialLabel==='疑似客變', color:'#8080e8', show:true},
+    {label:'收租屋', filter:r=>r.isSpecial&&r.specialLabel==='收租屋', color:'#e84a4a', show:true},
+    {label:'頂樓加蓋', filter:r=>r.isSpecial&&r.specialLabel==='頂樓加蓋', color:'#e8804a', show:true},
+    // 挑高/樓中樓：只有第二頁有特殊條件設定時才顯示
+    {label:'挑高/樓中樓', filter:r=>r.isSpecialFloor, color:'#e8a032', show:hasSpecialFloors},
+  ];
+  function getRoomRange(roomNum){
+    if(!hasLookup)return '';
+    const areas=Object.values(UNIT_LOOKUP)
+      .filter(u=>roomNum===4?u.rooms>=4:u.rooms===roomNum)
+      .map(u=>u.netArea).filter(Boolean).sort((a,b)=>a-b);
+    if(!areas.length)return '';
+    return `${areas[0]}~${areas[areas.length-1]}坪`;
+  }
+  const items=defs.map(d=>{
+    if(!d.show)return null;
+    const rows=data.filter(d.filter);
+    // 筆數為 0 且非主要房型 → 不顯示
+    const isMainRoom=['套房','2房','3房','4房以上'].includes(d.label);
+    if(!isMainRoom&&rows.length===0)return null;
+    // 主要房型筆數為 0 也不顯示（此社區沒有這種房型）
+    if(isMainRoom&&rows.length===0)return null;
+    const range=isMainRoom?
+      (d.label==='套房'?getRoomRange(1):
+       d.label==='2房'?getRoomRange(2):
+       d.label==='3房'?getRoomRange(3):
+       d.label==='4房以上'?getRoomRange(4):''):'';
+    return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0"></span>
+      <span style="font-size:0.82rem;color:var(--text)">${d.label}</span>
+      ${range?`<span style="font-size:0.7rem;color:var(--muted);font-family:'DM Mono',monospace">${range}</span>`:''}
+      <span style="font-size:0.92rem;font-weight:700;color:${d.color};font-family:'DM Mono',monospace">${rows.length}<span style="font-size:0.68rem;color:var(--muted);font-weight:400"> 筆</span></span>
+    </div>`;
+  }).filter(Boolean);
+  list.innerHTML=items.join('');
+}
+
+function renderCharts(data){
+  const hasLU=typeof UNIT_LOOKUP!=='undefined'&&Object.keys(UNIT_LOOKUP).length>0;
+  const showNeighbor=currentMode!=='townhouse'&&hasLU;
+  const H=[
+    '<div class="chart-card"><div class="chart-title">季成交均價趨勢 <span class="badge">QUARTERLY</span></div><div class="chart-subtitle">每季平均成交單價（萬/坪）</div><div class="chart-wrap"><canvas id="chartQuarterly"></canvas></div></div>',
+    '<div class="chart-card"><div class="chart-title">歷年成交均價 <span class="badge">YEARLY</span></div><div class="chart-subtitle">逐年平均成交單價（萬/坪）</div><div class="chart-wrap short"><canvas id="chartYearly"></canvas></div></div>',
+    '<div class="chart-card"><div class="chart-title">詳細統計表</div><div class="tab-row">',
+    '<button class="tab-btn active" onclick="showTab(&quot;quarterly&quot;)">季統計</button>',
+    '<button class="tab-btn" onclick="showTab(&quot;halfyear&quot;)">半年統計</button>',
+    '<button class="tab-btn" onclick="showTab(&quot;yearly&quot;)">年度統計</button>',
+    '<button class="tab-btn" onclick="showTab(&quot;range&quot;)">坪數統計</button>',
+    '<button class="tab-btn" onclick="showTab(&quot;raw&quot;)">原始資料</button>',
+    '</div><div class="table-wrap" id="tableArea"></div></div>'
+  ];
+  if(showNeighbor){
+    H.push('<div class="chart-card" id="neighborCard"><div class="chart-title">鄰居房價表 <span class="badge">NEIGHBOR</span></div><div class="chart-subtitle">每格顯示該單位最新一筆成交（民國年/月．萬/坪）</div><div id="neighborTable"></div></div>');
+    H.push('<div class="chart-card"><div class="chart-title">戶型坪數分析 <span class="badge">UNIT</span></div><div class="chart-subtitle">同門牌有無車位推算實際淨坪 · 格局異常偵測</div><div id="unitAnalysis"></div></div>');
+  }
+  H.push('<div class="chart-card" id="specialListCard" style="display:none"><div class="chart-title">特殊戶型明細 <span class="badge">SPECIAL</span></div><div class="chart-subtitle">收租屋 · 頂樓加蓋 · 疑似客變，已從圖表計算排除</div><div id="specialList"></div></div>');
+  document.getElementById('chartsArea').innerHTML=H.join('');
+  window._lastData=data;
+  setTimeout(()=>{
+    buildQuarterly(data);buildYearly(data);showTab('quarterly');
+    if(currentMode!=='townhouse'){
+      if(showNeighbor){buildNeighbor(data);buildUnitAnalysis(data);}
+    }
+    buildSpecialList(data);
+  },30);
+}
+
+
+function buildQuarterly(data){
+  // 圖表排除特殊戶型（7房、無隔間等），特殊條件樓層正常顯示
+  const chartData=data.filter(r=>!r.isSpecial);
+  const toQ=d=>{const[y,m]=d.date.split('-');return `${y}Q${Math.ceil(parseInt(m)/3)}`;};
+  const allQ=[...new Set(chartData.map(toQ))].sort();
+
+  // 固定四條格局曲線，依 netArea 分類（套房≤1房、2房、3房、4房+）
+  const roomGroups=[
+    {label:'套房',  color:PALETTE[0], filter:d=>d.rooms<=1},
+    {label:'2房',   color:PALETTE[1], filter:d=>d.rooms===2},
+    {label:'3房',   color:PALETTE[2], filter:d=>d.rooms===3},
+    {label:'4房以上',color:PALETTE[3], filter:d=>d.rooms>=4},
+  ];
+
+  const roomDatasets=roomGroups.map(g=>{
+    const rData=chartData.filter(g.filter);
+    const rGroups=groupBy(rData,toQ);
+    return{
+      label:g.label,
+      data:allQ.map(q=>rGroups[q]?+avg(rGroups[q].map(d=>d.unitPrice)).toFixed(1):null),
+      borderColor:g.color,
+      backgroundColor:g.color+'33',
+      borderWidth:2,tension:0.3,pointRadius:4,spanGaps:true,
+    };
+  });
+
+  // 全體均價虛線
+  const allGroups=groupBy(data,toQ);
+  roomDatasets.push({
+    label:'全體均價',
+    data:allQ.map(q=>allGroups[q]?+avg(allGroups[q].map(d=>d.unitPrice)).toFixed(1):null),
+    borderColor:'rgba(255,255,255,0.25)',backgroundColor:'transparent',
+    borderWidth:1.5,borderDash:[4,3],tension:0.3,pointRadius:0,spanGaps:true,
+  });
+
+  // 計算每季總成交筆數，作為 tooltip 補充資訊和低樣本警告
+  const qCountMap={};
+  allQ.forEach(q=>{qCountMap[q]=(allGroups[q]||[]).length;});
+  const LOW_SAMPLE=3; // 少於3筆標警告
+
+  // 低樣本季度在 label 後加 ⚠
+  const displayLabels=allQ.map(q=>{
+    const cnt=qCountMap[q]||0;
+    return cnt>0&&cnt<LOW_SAMPLE?`${q} ⚠`:q;
+  });
+
+  charts.quarterly=new Chart(document.getElementById('chartQuarterly'),{
+    type:'line',
+    data:{labels:displayLabels,datasets:roomDatasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,labels:{color:'#6b7299',boxWidth:12,font:{size:11}}},
+        tooltip:{
+          backgroundColor:'#1e2334',borderColor:'#2a3050',borderWidth:1,
+          callbacks:{
+            title(items){
+              // 去掉 ⚠ 還原原始季度名
+              return (items[0]?.label||'').replace(' ⚠','');
+            },
+            afterTitle(items){
+              const rawQ=(items[0]?.label||'').replace(' ⚠','');
+              const cnt=qCountMap[rawQ]||0;
+              return cnt>0&&cnt<LOW_SAMPLE?`⚠ 本季僅 ${cnt} 筆，參考性低`:`本季共 ${cnt} 筆成交`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{grid:{color:'rgba(42,48,80,0.6)'},ticks:{
+          maxRotation:60,font:{size:10},
+          color(ctx){
+            const lbl=displayLabels[ctx.index]||'';
+            return lbl.includes('⚠')?'#e8c84a':'#6b7299';
+          }
+        }},
+        y:{grid:{color:'rgba(42,48,80,0.6)'},title:{display:true,text:'萬/坪',color:'#6b7299'}}
+      }
+    }
+  });
+}
+
+function buildYearly(data){
+  if(charts.yearly)charts.yearly.destroy();
+  const el=document.getElementById('chartYearly');if(!el)return;
+  const chartData=data.filter(r=>!r.isSpecial);
+  const g=groupBy(chartData,d=>d.date.split('-')[0]);const l=Object.keys(g).sort();
+  const p=l.map(k=>+avg(g[k].map(d=>d.unitPrice)).toFixed(1));const c=l.map(k=>g[k].length);
+  charts.yearly=new Chart(el,{type:'line',data:{labels:l,datasets:[{label:'年均單價(萬/坪)',data:p,borderColor:'#4ae8a0',backgroundColor:'rgba(74,232,160,0.1)',borderWidth:2.5,tension:0.3,pointRadius:6,pointBackgroundColor:'#4ae8a0',fill:true,yAxisID:'y'},{label:'成交筆數',data:c,borderColor:'#4a8fe8',borderDash:[4,3],borderWidth:1.5,tension:0.3,pointRadius:3,yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#6b7299',boxWidth:12}},tooltip:{backgroundColor:'#1e2334',borderColor:'#2a3050',borderWidth:1}},scales:{x:{grid:{color:'rgba(42,48,80,0.6)'}},y:{grid:{color:'rgba(42,48,80,0.6)'},title:{display:true,text:'萬/坪',color:'#6b7299'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'筆數',color:'#6b7299'}}}}});
+}
+
+// ── 鄰居詳情彈窗 ──
+let _neighborHistory={};
+
+function openNeighborModal(key){
+  const hist=_neighborHistory[key];
+  if(!hist||!hist.length)return;
+  const latest=hist[0];
+  const [y,m]=latest.date.split('-');
+  const roc=parseInt(y)-1911;
+
+  // 標題：地址簡稱 + 棟別
+  const addrShort=latest.address.replace(/^.{2,4}[區市縣].{1,3}[區鄉鎮]/,'').replace(/[一二三四五六七八九十]+樓.*/,'').trim();
+  document.getElementById('modalTitle').textContent=addrShort||latest.address;
+  const blockStr=latest.block?` ｜ ${latest.block}棟`:'';
+  const sfStr=latest.isSpecialFloor&&typeof SPECIAL_FLOOR_DESC!=='undefined'?` ｜ 📌${SPECIAL_FLOOR_DESC[latest.floor]||'特殊條件'}`:'';
+  document.getElementById('modalSubtitle').textContent=`${latest.rooms>0?latest.rooms+'房':'—'}｜${(latest.netArea||latest.area).toFixed(1)}坪${blockStr}${sfStr}`;
+
+  // 成交紀錄
+  let body='';
+  hist.forEach((r,i)=>{
+    const[ry,rm]=r.date.split('-');
+    const rocY=parseInt(ry)-1911;
+    const totalDisp=r.totalPrice?`${r.totalPrice}萬`:'—';
+    const rawDisp=r.parkingPrice>0?`${r.rawTotalPrice}萬（含車位）`:'';
+    const carDisp=r.carCount>0?`車位${r.carCount}個`:'無車位';
+    const parkDisp=r.parkingPrice>0?`車位${r.parkingPrice}萬`:'';
+    const sfTag=r.isSpecialFloor&&typeof SPECIAL_FLOOR_DESC!=='undefined'?
+      `<div class="txn-note">📌 ${SPECIAL_FLOOR_DESC[r.floor]||'特殊條件'}</div>`:'';
+    const specTag=r.isSpecial?`<div class="txn-note">★ 特殊戶型（疑似客變）</div>`:'';
+    const noteStr=r.note?`<div class="txn-note">備註：${r.note}</div>`:'';
+    body+=`<div class="txn-card">
+      <div style="display:flex;align-items:center;gap:0;margin-bottom:6px">
+        <span class="txn-num">${i+1}</span>
+        <span class="txn-date">${rocY}年${rm}月</span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="txn-price">${r.unitPrice.toFixed(1)}</span>
+        <span class="txn-unit">萬/坪</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:0.72rem;color:var(--muted)">房屋</span>
+        <span style="font-size:1.05rem;font-weight:700;color:#4ae8a0;font-family:'DM Mono',monospace">${totalDisp}</span>
+        ${parkDisp?`
+        <span style="font-size:0.78rem;color:var(--muted)">＋ 車位</span>
+        <span style="font-size:1.05rem;font-weight:700;color:#4a8fe8;font-family:'DM Mono',monospace">${r.parkingPrice}萬</span>`:''}
+        ${rawDisp?`
+        <span style="font-size:0.78rem;color:var(--muted)">＝ 含車位</span>
+        <span style="font-size:1.05rem;font-weight:700;color:#e8c84a;font-family:'DM Mono',monospace">${r.rawTotalPrice}萬</span>`:''}
+      </div>
+      <div class="txn-row">
+        <span class="txn-tag accent">${(r.netArea||r.area).toFixed(1)} 坪</span>
+        <span class="txn-tag">${r.floor}F / ${r.totalFloor||'—'}F</span>
+        <span class="txn-tag">${carDisp}</span>
+        <span class="txn-tag">${r.type||'—'}</span>
+        ${r.layout?`<span class="txn-tag">${r.layout}</span>`:''}
+      </div>
+      ${sfTag}${specTag}${noteStr}
+    </div>`;
+  });
+  document.getElementById('modalBody').innerHTML=body;
+  document.getElementById('neighborModal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+
+function closeNeighborModal(e){
+  if(e&&e.target!==document.getElementById('neighborModal'))return;
+  document.getElementById('neighborModal').style.display='none';
+  document.body.style.overflow='';
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNeighborModal();});
+
+function buildNeighbor(data){
+  const el=document.getElementById('neighborTable');if(!el)return;
+  const allNums=[...new Set(data.map(r=>r.houseNum).filter(Boolean))].sort((a,b)=>parseFloat(a.replace('-','.'))-parseFloat(b.replace('-','.')));
+  const allFloors=[...new Set(data.map(r=>r.floor).filter(f=>f>0))].sort((a,b)=>b-a);
+  if(!allNums.length||!allFloors.length){el.innerHTML='<p style="color:var(--muted);padding:12px">無法解析門牌或樓層資料</p>';return;}
+
+  // 每個格子收集所有歷史成交，由新到舊排序
+  const historyMap={};
+  data.forEach(r=>{
+    if(!r.houseNum||!r.floor)return;
+    const key=`${r.houseNum}_${r.floor}`;
+    if(!historyMap[key])historyMap[key]=[];
+    historyMap[key].push(r);
+  });
+  Object.values(historyMap).forEach(arr=>arr.sort((a,b)=>b.date.localeCompare(a.date)));
+
+  // 存到全域供彈窗使用
+  _neighborHistory=historyMap;
+
+  const th=allNums.map(n=>`<th style="text-align:center;min-width:85px;white-space:nowrap">${n}號</th>`).join('');
+  const rows=allFloors.map(fl=>{
+    const cells=allNums.map(n=>{
+      const key=`${n}_${fl}`;
+      const hist=historyMap[key];
+      if(!hist||!hist.length)return`<td style="text-align:center;color:var(--muted);font-size:0.8rem;padding:10px 4px">---</td>`;
+      const latest=hist[0];
+      const[y,m]=latest.date.split('-');
+      const roc=parseInt(y)-1911;
+      const sfColor=latest.isSpecialFloor?'rgba(232,160,50,0.15)':latest.isSpecial?'rgba(128,128,232,0.1)':'transparent';
+      const sfDot=latest.isSpecialFloor?`<div style="width:5px;height:5px;border-radius:50%;background:#e8a032;margin:2px auto 0"></div>`:
+                  latest.isSpecial?`<div style="width:5px;height:5px;border-radius:50%;background:#8080e8;margin:2px auto 0"></div>`:'';
+      const countBadge=hist.length>1?`<div style="font-size:0.58rem;color:var(--accent2);margin-top:1px">共${hist.length}筆</div>`:'';
+      return`<td class="neighbor-cell-btn" onclick="openNeighborModal('${key}')"
+        style="text-align:center;padding:8px 4px;vertical-align:middle;background:${sfColor};border-radius:6px;cursor:pointer">
+        <div style="font-size:0.65rem;color:var(--muted)">${roc}/${m}</div>
+        <div style="color:var(--accent);font-family:'DM Mono',monospace;font-weight:700;font-size:0.92rem">${latest.unitPrice.toFixed(1)}</div>
+        <div style="font-size:0.6rem;color:var(--muted)">萬/坪</div>
+        ${sfDot}${countBadge}
+      </td>`;
+    }).join('');
+    return`<tr><td style="text-align:center;font-weight:600;white-space:nowrap;background:var(--panel2);padding:8px 12px;position:sticky;left:0">${fl}樓</td>${cells}</tr>`;
+  }).join('');
+  el.innerHTML=`<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;border-spacing:2px"><thead><tr><th style="background:var(--panel2);position:sticky;left:0;padding:8px 12px">樓層/號</th>${th}</tr></thead><tbody>${rows}</tbody></table></div>
+  <p style="font-size:0.68rem;color:var(--muted);margin-top:8px;padding:0 4px">點擊格子查看完整成交紀錄</p>`;
+}
+
+function buildSpecialList(data){
+  const card=document.getElementById('specialListCard');
+  const el=document.getElementById('specialList');
+  if(!card||!el)return;
+  // 用 rawData 確保特殊戶型不被 getFiltered 篩掉
+  const specRows=(typeof rawData!=='undefined'?rawData:data).filter(r=>r.isSpecial);
+  if(!specRows.length){card.style.display='none';return;}
+  card.style.display='';
+
+  // 依 specialLabel 分組
+  const groups={};
+  specRows.forEach(r=>{
+    const lbl=r.specialLabel||'疑似客變';
+    if(!groups[lbl])groups[lbl]=[];
+    groups[lbl].push(r);
+  });
+  const colorMap={'收租屋':'var(--danger)','頂樓加蓋':'#e8804a','疑似客變':'#8080e8'};
+  const iconMap={'收租屋':'🏠','頂樓加蓋':'🏗','疑似客變':'★'};
+
+  let html='';
+  Object.entries(groups).forEach(([lbl,rows])=>{
+    const color=colorMap[lbl]||'#8080e8';
+    const icon=iconMap[lbl]||'★';
+    html+=`<div style="margin-bottom:16px">
+      <div style="font-size:0.75rem;font-weight:700;color:${color};margin-bottom:8px;font-family:'DM Mono',monospace">
+        ${icon} ${lbl}（${rows.length}筆）
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>日期</th><th>地址</th><th>格局</th>
+          <th style="text-align:right">坪數</th><th style="text-align:center">樓層</th>
+          <th>單價</th><th>總價(萬)</th>
+        </tr></thead>
+        <tbody>${rows.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`
+          <tr style="background:${color}18">
+            <td class="td-num">${r.date}</td>
+            <td style="font-size:0.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.address}</td>
+            <td style="font-size:0.75rem;color:${color}">${r.layout||'—'}</td>
+            <td class="td-num" style="text-align:right">${(r.netArea||r.area).toFixed(1)}</td>
+            <td class="td-num" style="text-align:center">${r.floor||'—'}/${r.totalFloor||'—'}</td>
+            <td class="td-accent">${r.unitPrice.toFixed(1)}</td>
+            <td class="td-num">${r.totalPrice}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function buildUnitAnalysis(data){
+  const el=document.getElementById('unitAnalysis');
+  if(!el)return;
+
+  // ── 從 UNIT_LOOKUP 比對每筆成交坪數 ──
+  const anomalies=[];
+  data.forEach(r=>{
+    if(!r.houseNum||r.isSpecial||r.isSpecialFloor)return;
+    const info=UNIT_LOOKUP[r.houseNum];
+    if(!info)return;
+    const stdArea=info.netArea;
+    const actualNet=r.netArea||r.area;
+    const diff=Math.abs(actualNet-stdArea);
+    const pct=diff/stdArea;
+    if(pct>0.15&&diff>3){
+      anomalies.push({...r,stdArea,actualNet,diff:diff.toFixed(1),pct:(pct*100).toFixed(0)});
+    }
+  });
+
+  // ── 1. 社區戶型對照表 ──
+  const roomGroups={2:[],3:[],4:[]};
+  Object.entries(UNIT_LOOKUP).forEach(([num,info])=>{
+    const r=info.rooms>=4?4:info.rooms;
+    if(roomGroups[r])roomGroups[r].push({num,info});
+  });
+
+  let html=`<div style="margin-bottom:20px">
+    <div style="font-size:0.75rem;font-weight:700;color:var(--accent3);margin-bottom:12px;font-family:'DM Mono',monospace">▎社區戶型對照（第二頁資料）</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>房型</th><th>門牌</th><th>棟別</th><th style="text-align:right">標準淨坪</th>
+        <th style="text-align:center">成交筆數</th><th style="text-align:center">均單價</th>
+      </tr></thead><tbody>`;
+
+  [2,3,4].forEach(rm=>{
+    const grp=roomGroups[rm]||[];
+    grp.sort((a,b)=>a.info.netArea-b.info.netArea);
+    grp.forEach(({num,info},i)=>{
+      const txns=data.filter(r=>r.houseNum===num&&!r.isSpecial&&!r.isSpecialFloor);
+      const avgPrice=txns.length?avg(txns.map(r=>r.unitPrice)).toFixed(1):'—';
+      html+=`<tr>
+        ${i===0?`<td rowspan="${grp.length}" style="font-weight:700;color:var(--accent);vertical-align:top">${rm===4?'4房以上':rm+'房'}</td>`:''}
+        <td class="td-num">${num}號</td>
+        <td style="font-size:0.75rem;color:var(--accent3);font-family:'DM Mono',monospace">${info.block||'—'}</td>
+        <td class="td-num" style="text-align:right">${info.netArea}坪</td>
+        <td class="td-num" style="text-align:center">${txns.length}筆</td>
+        <td class="td-accent" style="text-align:center;font-size:0.78rem">${avgPrice==='—'?'—':avgPrice+'萬/坪'}</td>
+      </tr>`;
+    });
+  });
+  html+='</tbody></table></div></div>';
+
+  // ── 2. 坪數疑似異常（與標準淨坪差距 >15%）──
+  if(anomalies.length){
+    html+=`<div style="margin-bottom:20px">
+      <div style="font-size:0.75rem;font-weight:700;color:var(--danger);margin-bottom:10px;font-family:'DM Mono',monospace">▎坪數疑似異常（扣車位後與標準淨坪差距 &gt;15%）</div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">仍納入統計，建議人工確認原始資料</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>日期</th><th>地址</th><th>棟別</th><th>格局</th>
+          <th style="text-align:right">實際淨坪</th><th style="text-align:right">標準淨坪</th>
+          <th style="text-align:center">差距</th><th>單價</th>
+        </tr></thead>
+        <tbody>${anomalies.map(r=>`<tr style="background:rgba(232,74,74,0.08)">
+          <td class="td-num">${r.date}</td>
+          <td style="font-size:0.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.address}</td>
+          <td style="font-size:0.72rem;color:var(--accent3)">${r.block||'—'}</td>
+          <td style="font-size:0.75rem">${r.layout||'—'}</td>
+          <td class="td-num" style="text-align:right;color:var(--danger)">${r.actualNet.toFixed(1)}坪</td>
+          <td class="td-num" style="text-align:right;color:var(--muted)">${r.stdArea}坪</td>
+          <td style="text-align:center;font-size:0.75rem;color:var(--danger)">差${r.diff}坪(${r.pct}%)</td>
+          <td class="td-accent">${r.unitPrice.toFixed(1)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── 3. 特殊條件（挑高/樓中樓）——最底部 ──
+  const sfRows=data.filter(r=>r.isSpecialFloor);
+  if(sfRows.length){
+    html+=`<div style="margin-bottom:20px">
+      <div style="font-size:0.75rem;font-weight:700;color:#e8a032;margin-bottom:10px;font-family:'DM Mono',monospace">▎特殊條件（挑高／樓中樓）</div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">1樓=挑高、14樓=樓中樓，成交已納入統計，僅供額外參考</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>日期</th><th>地址</th><th>格局</th><th>棟別</th><th>條件</th><th style="text-align:right">坪數</th><th>單價</th><th>總價(萬)</th></tr></thead>
+        <tbody>${sfRows.map(r=>{
+          const desc=(typeof SPECIAL_FLOOR_DESC!=='undefined'&&SPECIAL_FLOOR_DESC[r.floor])||'特殊';
+          return`<tr style="background:rgba(232,160,50,0.08)">
+            <td class="td-num">${r.date}</td>
+            <td style="font-size:0.72rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.address}</td>
+            <td style="font-size:0.75rem">${r.layout||'—'}</td>
+            <td style="font-size:0.72rem;color:var(--accent3)">${r.block||'—'}</td>
+            <td style="text-align:center"><span style="background:rgba(232,160,50,0.2);color:#e8a032;padding:2px 8px;border-radius:4px;font-size:0.7rem">${desc}</span></td>
+            <td class="td-num" style="text-align:right">${(r.netArea||r.area).toFixed(1)}</td>
+            <td class="td-accent">${r.unitPrice.toFixed(1)}</td>
+            <td class="td-num">${r.totalPrice}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // ── 4. 疑似客變（特殊戶型）——最底部 ──
+  const svRows=data.filter(r=>r.isSpecial);
+  if(svRows.length){
+    const rentalRows=svRows.filter(r=>r.specialLabel==='收租屋');
+    const kaiRows=svRows.filter(r=>r.specialLabel!=='收租屋');
+    const svTitle=rentalRows.length&&kaiRows.length?'疑似客變 / 收租屋':
+                  rentalRows.length?'收租屋':'疑似客變';
+    html+=`<div>
+      <div style="font-size:0.75rem;font-weight:700;color:#8080e8;margin-bottom:10px;font-family:'DM Mono',monospace">▎${svTitle}（特殊戶型）</div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">格局異常或收租屋特徵（衛浴≥4且廳≤1），已從圖表計算排除</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>日期</th><th>地址</th><th>登記格局</th><th>棟別</th><th style="text-align:right">坪數</th><th>單價</th><th>總價(萬)</th></tr></thead>
+        <tbody>${svRows.map(r=>`<tr style="background:rgba(128,128,232,0.08)">
+          <td class="td-num">${r.date}</td>
+          <td style="font-size:0.72rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.address}</td>
+          <td style="font-size:0.75rem;color:${r.specialLabel==='收租屋'?'var(--danger)':r.specialLabel==='頂樓加蓋'?'#e8804a':'#8080e8'}">${r.layout||'—'}</td>
+          <td style="text-align:center"><span style="font-size:0.68rem;padding:2px 6px;border-radius:4px;
+            background:${r.specialLabel==='收租屋'?'rgba(232,74,74,0.15)':r.specialLabel==='頂樓加蓋'?'rgba(232,128,74,0.15)':'rgba(128,128,232,0.15)'};
+            color:${r.specialLabel==='收租屋'?'var(--danger)':r.specialLabel==='頂樓加蓋'?'#e8804a':'#8080e8'}">${r.specialLabel||'特殊'}</span></td>
+          <td style="font-size:0.72rem;color:var(--accent3)">${r.block||'—'}</td>
+          <td class="td-num" style="text-align:right">${(r.netArea||r.area).toFixed(1)}</td>
+          <td class="td-accent">${r.unitPrice.toFixed(1)}</td>
+          <td class="td-num">${r.totalPrice}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  if(!Object.keys(UNIT_LOOKUP).length){
+    html='<p style="color:var(--muted);padding:12px;font-size:0.82rem">此功能需要 Excel 第二頁「門牌戶型比對」資料</p>';
+  }
+
+  el.innerHTML=html;
+}
+
+function median(arr){
+  if(!arr.length)return 0;
+  const s=[...arr].sort((a,b)=>a-b);
+  const m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+
+function showTab(tab){
+  currentTab=tab;
+  const data=window._lastData||[];
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.querySelector(`.tab-btn[onclick*="'${tab}'"]`);
+  if(btn)btn.classList.add('active');
+  const area=document.getElementById('tableArea');
+  if(!area||!data.length)return;
+
+  function makeRangeCols(){return ranges.map(r=>`<th style="text-align:center">${r.label}</th>`).join('');}
+  function makeRangeCells(gr){return ranges.map(r=>{const g2=gr.filter(x=>(x.netArea||x.area)>=r.min&&(x.netArea||x.area)<r.max);return g2.length?`<td class="td-accent" style="text-align:center">${avg(g2.map(x=>x.unitPrice)).toFixed(1)}<br><span style="color:var(--muted);font-size:0.68rem">(${g2.length}筆)</span></td>`:`<td style="text-align:center;color:var(--muted)">—</td>`;}).join('');}
+
+  if(tab==='quarterly'){
+    const toQ=r=>{const[y,m]=r.date.split('-');return`${y} Q${Math.ceil(parseInt(m)/3)}`;};
+    const g=groupBy(data,toQ);
+    const rows=Object.keys(g).sort().map(q=>{const gr=g[q];return`<tr><td class="td-num">${q}</td><td class="td-num">${gr.length}</td><td class="td-accent">${avg(gr.map(r=>r.unitPrice)).toFixed(1)}</td><td class="td-num">${avg(gr.map(r=>r.totalPrice)).toFixed(0)}</td>${makeRangeCells(gr)}</tr>`;}).join('');
+    area.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>季度</th><th>筆數</th><th>全體均價</th><th>均總價(萬)</th>${makeRangeCols()}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }else if(tab==='halfyear'){
+    const toH=r=>{const[y,m]=r.date.split('-');return`${y} ${parseInt(m)<=6?'上半年':'下半年'}`;};
+    const g=groupBy(data,toH);
+    const rows=Object.keys(g).sort().map(h=>{const gr=g[h];return`<tr><td class="td-num">${h}</td><td class="td-num">${gr.length}</td><td class="td-accent">${avg(gr.map(r=>r.unitPrice)).toFixed(1)}</td><td class="td-num">${avg(gr.map(r=>r.totalPrice)).toFixed(0)}</td>${makeRangeCells(gr)}</tr>`;}).join('');
+    area.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>期間</th><th>筆數</th><th>全體均價</th><th>均總價(萬)</th>${makeRangeCols()}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }else if(tab==='yearly'){
+    const g=groupBy(data,r=>r.date.split('-')[0]);
+    const rows=Object.keys(g).sort().map(y=>{const gr=g[y];return`<tr><td class="td-num">${y} 年</td><td class="td-num">${gr.length}</td><td class="td-accent">${avg(gr.map(r=>r.unitPrice)).toFixed(1)}</td><td class="td-num">${avg(gr.map(r=>r.totalPrice)).toFixed(0)}</td>${makeRangeCells(gr)}</tr>`;}).join('');
+    area.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>年份</th><th>筆數</th><th>全體均價</th><th>均總價(萬)</th>${makeRangeCols()}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }else if(tab==='range'){
+    const rows=ranges.map((r,i)=>{const g=data.filter(x=>(x.netArea||x.area)>=r.min&&(x.netArea||x.area)<r.max);const dot=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${PALETTE[i%PALETTE.length]};margin-right:6px;vertical-align:middle"></span>`;if(!g.length)return`<tr><td>${dot}${r.label}</td><td>0</td><td>—</td><td>—</td></tr>`;return`<tr><td>${dot}${r.label}</td><td class="td-num">${g.length}</td><td class="td-accent">${avg(g.map(x=>x.unitPrice)).toFixed(1)}</td><td class="td-num">${avg(g.map(x=>x.totalPrice)).toFixed(0)}</td></tr>`;}).join('');
+    area.innerHTML=`<table><thead><tr><th>坪數區間</th><th>筆數</th><th>均單價(萬/坪)</th><th>均總價(萬)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }else if(tab==='raw'){
+    // 合理坪數下限
+    const minAreaByRoom={0:5,1:5,2:15,3:20,4:30,5:30};
+    const rows=data.slice(0,500).map(r=>{
+      const net=r.netArea||r.area;
+      const minOk=net>=(minAreaByRoom[Math.min(r.rooms,5)]||5);
+      const isSpec=r.isSpecial;
+      const isSF=r.isSpecialFloor;
+      const specBg=r.specialLabel==='收租屋'?'rgba(232,74,74,0.10)':
+                   r.specialLabel==='頂樓加蓋'?'rgba(232,128,74,0.10)':'rgba(74,74,232,0.10)';
+      const rowStyle=isSF?'background:rgba(232,160,50,0.10);':isSpec?`background:${specBg};`:!minOk?'background:rgba(232,74,74,0.12);':'';
+      const sfDesc=r.floor&&typeof SPECIAL_FLOOR_DESC!=='undefined'?SPECIAL_FLOOR_DESC[r.floor]||'特殊條件':'特殊條件';
+      const specColor=r.specialLabel==='收租屋'?'var(--danger)':
+                       r.specialLabel==='頂樓加蓋'?'#e8804a':'#8080e8';
+      const specIcon=r.specialLabel==='收租屋'?'🏠':
+                      r.specialLabel==='頂樓加蓋'?'🏗':'★';
+      const warn=isSF
+        ?` <span style="color:#e8a032;font-size:0.65rem">📌 ${sfDesc}</span>`
+        :isSpec?` <span style="color:${specColor};font-size:0.65rem">${specIcon} ${r.specialLabel||'特殊戶型'}</span>`
+        :!minOk?` <span style="color:var(--danger);font-size:0.65rem">⚠ 疑似異常</span>`:'';
+      return`<tr style="${rowStyle}">
+        <td class="td-num">${r.date}</td>
+        <td style="font-size:0.75rem;text-align:center">${r.rooms>0?r.rooms+'房':'—'}${warn}</td>
+        <td style="font-size:0.72rem;text-align:center;font-family:'DM Mono',monospace;color:var(--accent)">${r.block||'—'}</td>
+        <td style="font-size:0.75rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.address||r.community||'—'}</td>
+        <td class="td-num">原${r.area.toFixed(1)}<br><span style="font-size:0.65rem;color:${!minOk?'var(--danger)':'var(--muted)'}">淨${net.toFixed(1)}</span></td>
+        <td class="td-num" style="font-size:0.7rem;color:var(--muted)">${r.carCount>0?`車${r.carCount}`:''}</td>
+        <td class="td-accent">${r.unitPrice.toFixed(1)}</td>
+        <td class="td-num">${r.totalPrice}</td>
+        <td class="td-num">${r.floor||'—'}/${r.totalFloor||'—'}</td>
+      </tr>`;
+    }).join('');
+    area.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>日期</th><th style="text-align:center">格局</th><th>棟別</th><th>地址/社區</th><th>原坪/淨坪</th><th>車位</th><th>單價</th><th>總價(萬)</th><th>樓別</th></tr></thead><tbody>${rows}</tbody></table></div>${data.length>500?`<p style="padding:10px 12px;font-size:0.75rem;color:var(--muted)">僅顯示前500筆，共${data.length}筆</p>`:''}`;
+  }
+}
+
+function avg(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;}
+function groupBy(arr,fn){return arr.reduce((acc,item)=>{const k=fn(item);if(!acc[k])acc[k]=[];acc[k].push(item);return acc;},{});}
+</script>
+<!-- 鄰居詳情彈窗 -->
+<div class="modal-overlay" id="neighborModal" style="display:none" onclick="closeNeighborModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">—</div>
+        <div class="modal-subtitle" id="modalSubtitle">—</div>
+      </div>
+      <button class="modal-close" onclick="closeNeighborModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+</body>
+</html>
